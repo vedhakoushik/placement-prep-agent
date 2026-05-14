@@ -30,8 +30,16 @@ def call_gemini(messages: list) -> str:
     return response.json()["candidates"][0]["content"]["parts"][0]["text"]
 
 
+def get_ideal_answer(company: str, role: str, question: str) -> str:
+    """Generate a model answer for the question — shown only if candidate requests it."""
+    prompt = (f"A candidate for {role} at {company} was asked: \"{question}\"\n\n"
+              f"Give a strong, concise model answer (8-10 lines) that would impress an interviewer. "
+              f"Format it clearly with key points.")
+    messages = [{"role": "user", "parts": [{"text": prompt}]}]
+    return call_gemini(messages)
+
+
 def get_performance_summary(company: str, role: str, qa_pairs: list) -> dict:
-    """Ask Gemini to evaluate the full session and return a JSON report."""
     qa_text = "\n\n".join(
         f"Q{i+1}: {qa['question']}\nA{i+1}: {qa['answer']}\nFeedback: {qa['feedback']}"
         for i, qa in enumerate(qa_pairs)
@@ -84,6 +92,10 @@ def main():
 ║              Terminal Interview Coach  🎯                    ║
 ║         Powered by Gemini 2.5 Flash + raw httpx              ║
 ╚══════════════════════════════════════════════════════════════╝
+  After each answer you can type:
+    's' → skip (move to next question)
+    'a' → see the ideal answer for that question
+    anything else → your actual answer
 """)
 
     company = input("  Company you're preparing for: ").strip()
@@ -91,7 +103,6 @@ def main():
     print()
     divider()
 
-    # Kick off the interview
     messages = []
     opening = (f"Start the mock interview for {role} at {company}. "
                f"Greet the candidate warmly, then ask your first question.")
@@ -101,20 +112,35 @@ def main():
     messages.append({"role": "model", "parts": [{"text": reply}]})
     print(f"\nInterviewer: {reply}\n")
 
+    # Extract the first question from the opening reply
+    current_question = reply
+
     qa_pairs = []
     total_questions = 5
 
     for q_num in range(1, total_questions + 1):
         divider("·")
-        print(f"  Question {q_num} of {total_questions}")
+        print(f"  Question {q_num} of {total_questions}  [ type 'a' for ideal answer | 's' to skip ]")
         divider("·")
 
-        # Candidate answers
         answer = input("\nYou: ").strip()
-        if not answer:
-            answer = "(no answer given)"
 
-        # Ask for feedback + next question (if not last)
+        # ── SHOW IDEAL ANSWER ──────────────────────────────────────
+        if answer.lower() == "a":
+            print("\n  Fetching ideal answer...\n")
+            ideal = get_ideal_answer(company, role, current_question)
+            divider("·")
+            print(f"  IDEAL ANSWER:\n")
+            print(f"  {ideal.replace(chr(10), chr(10) + '  ')}")
+            divider("·")
+            print("\n  Now give your own answer (or 's' to skip):\n")
+            answer = input("You: ").strip()
+
+        # ── SKIP ───────────────────────────────────────────────────
+        if answer.lower() == "s" or not answer:
+            answer = "(skipped)"
+
+        # ── GET FEEDBACK + NEXT QUESTION ──────────────────────────
         if q_num < total_questions:
             prompt = (f"The candidate answered: \"{answer}\"\n"
                       f"Give brief feedback on that answer, then ask question {q_num + 1} of {total_questions}.")
@@ -128,15 +154,16 @@ def main():
 
         print(f"\nInterviewer: {reply}\n")
 
-        # Extract question text from message history for the report
-        last_interviewer_question = messages[-4]["parts"][0]["text"] if len(messages) >= 4 else opening
+        # Track the next question (last thing the interviewer said)
+        current_question = reply
+
         qa_pairs.append({
             "question": f"Question {q_num}",
             "answer": answer,
             "feedback": reply,
         })
 
-    # Generate performance summary
+    # ── PERFORMANCE SUMMARY ────────────────────────────────────────
     divider()
     print("\n  Generating your performance report...\n")
     try:
@@ -168,7 +195,6 @@ def main():
         print(f"  [Could not parse summary: {e}]")
         summary = {}
 
-    # Save session
     filepath = save_session(company, role, qa_pairs, summary)
     print(f"\n  Session saved → {filepath}\n")
 
