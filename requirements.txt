@@ -2,11 +2,12 @@
 httpx==0.27.0
 python-dotenv==1.0.1
 
-# Week 2 (add when needed)
-# langchain
-# langchain-anthropic
-# langchain-community
-# tavily-python
+# Week 2
+langchain==0.3.25
+langchain-google-genai==2.1.4
+langchain-community==0.3.24
+pydantic==2.11.4
+tavily-python==0.5.1
 
 # Week 3
 # chromadb
