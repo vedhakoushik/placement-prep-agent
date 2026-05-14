@@ -1,0 +1,16 @@
+# Week 1
+httpx==0.27.0
+python-dotenv==1.0.1
+
+# Week 2 (add when needed)
+# langchain
+# langchain-anthropic
+# langchain-community
+# tavily-python
+
+# Week 3
+# chromadb
+
+# Week 5
+# streamlit
+# langsmith

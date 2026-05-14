@@ -1,0 +1,29 @@
+# Environment & secrets — NEVER commit these
+.env
+*.env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# Data & sessions
+data/sessions/
+*.json
+chroma_db/
+
+# IDE
+.vscode/
+.idea/
+*.DS_Store
+
+# LangSmith / logs
+*.log
+langsmith_traces/
