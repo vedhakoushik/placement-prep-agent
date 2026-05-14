@@ -5,32 +5,27 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-API_KEY = os.getenv("ANTHROPIC_API_KEY")
-API_URL = "https://api.anthropic.com/v1/messages"
+API_KEY = os.getenv("GEMINI_API_KEY")
+MODEL = "gemini-2.0-flash"
+API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent?key={API_KEY}"
 
-HEADERS = {
-    "x-api-key": API_KEY,
-    "anthropic-version": "2023-06-01",
-    "content-type": "application/json",
-}
+SYSTEM_PROMPT = "You are a placement advisor helping engineering students prepare for tech company interviews in India."
 
 
-def call_claude(user_message: str) -> dict:
+def call_gemini(user_message: str) -> dict:
     payload = {
-        "model": "claude-sonnet-4-6",
-        "max_tokens": 1024,
-        "system": "You are a placement advisor helping engineering students prepare for tech company interviews in India.",
-        "messages": [
-            {"role": "user", "content": user_message}
+        "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+        "contents": [
+            {"role": "user", "parts": [{"text": user_message}]}
         ],
     }
-    response = httpx.post(API_URL, headers=HEADERS, json=payload, timeout=30)
+    response = httpx.post(API_URL, json=payload, timeout=30)
     response.raise_for_status()
     return response.json()
 
 
 def main():
-    print("Claude API — raw HTTP (type 'quit' to exit)\n")
+    print("Gemini API — raw HTTP (type 'quit' to exit)\n")
 
     while True:
         user_input = input("You: ").strip()
@@ -39,17 +34,20 @@ def main():
         if not user_input:
             continue
 
-        data = call_claude(user_input)
+        data = call_gemini(user_input)
 
-        # Uncomment the next line any time you want to see the raw API response
-        # print(json.dumps(data, indent=2))
+        # Gemini field mapping (vs Anthropic):
+        #   candidates[0].content.parts[0].text  →  content[0].text
+        #   candidates[0].finishReason            →  stop_reason
+        #   usageMetadata.promptTokenCount        →  usage.input_tokens
+        #   usageMetadata.candidatesTokenCount    →  usage.output_tokens
 
-        reply = data["content"][0]["text"]
-        input_tokens = data["usage"]["input_tokens"]
-        output_tokens = data["usage"]["output_tokens"]
-        stop_reason = data["stop_reason"]
+        reply = data["candidates"][0]["content"]["parts"][0]["text"]
+        input_tokens = data["usageMetadata"]["promptTokenCount"]
+        output_tokens = data["usageMetadata"]["candidatesTokenCount"]
+        stop_reason = data["candidates"][0]["finishReason"]
 
-        print(f"\nClaude: {reply}")
+        print(f"\nGemini: {reply}")
         print(f"\n[tokens: {input_tokens} in / {output_tokens} out | stop: {stop_reason}]\n")
 
 

@@ -6,26 +6,19 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-API_KEY = os.getenv("ANTHROPIC_API_KEY")
-API_URL = "https://api.anthropic.com/v1/messages"
-
-HEADERS = {
-    "x-api-key": API_KEY,
-    "anthropic-version": "2023-06-01",
-    "content-type": "application/json",
-}
+API_KEY = os.getenv("GEMINI_API_KEY")
+MODEL = "gemini-2.0-flash"
+API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent?key={API_KEY}"
 
 SYSTEM_PROMPT = "You are a placement advisor helping engineering students prepare for tech company interviews in India."
 
 
-def call_claude(messages: list) -> dict:
+def call_gemini(messages: list) -> dict:
     payload = {
-        "model": "claude-sonnet-4-6",
-        "max_tokens": 1024,
-        "system": SYSTEM_PROMPT,
-        "messages": messages,       # full history sent every time
+        "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+        "contents": messages,   # full history sent every time — same concept as Anthropic
     }
-    response = httpx.post(API_URL, headers=HEADERS, json=payload, timeout=30)
+    response = httpx.post(API_URL, json=payload, timeout=30)
     response.raise_for_status()
     return response.json()
 
@@ -40,10 +33,12 @@ def save_session(messages: list):
 
 
 def main():
-    print("Multi-turn conversation with Claude (type 'quit' to exit)\n")
+    print("Multi-turn conversation with Gemini (type 'quit' to exit)\n")
     print(f"System: {SYSTEM_PROMPT}\n")
 
-    messages = []   # this list grows with every turn — Claude's "memory"
+    # Gemini uses "model" for assistant role; Anthropic uses "assistant"
+    # Everything else (appending history, sending full list) is identical
+    messages = []
 
     while True:
         user_input = input("You: ").strip()
@@ -53,17 +48,17 @@ def main():
         if not user_input:
             continue
 
-        messages.append({"role": "user", "content": user_input})
+        messages.append({"role": "user", "parts": [{"text": user_input}]})
 
-        data = call_claude(messages)
+        data = call_gemini(messages)
 
-        reply = data["content"][0]["text"]
-        input_tokens = data["usage"]["input_tokens"]
-        output_tokens = data["usage"]["output_tokens"]
+        reply = data["candidates"][0]["content"]["parts"][0]["text"]
+        input_tokens = data["usageMetadata"]["promptTokenCount"]
+        output_tokens = data["usageMetadata"]["candidatesTokenCount"]
 
-        messages.append({"role": "assistant", "content": reply})
+        messages.append({"role": "model", "parts": [{"text": reply}]})
 
-        print(f"\nClaude: {reply}")
+        print(f"\nGemini: {reply}")
         print(f"\n[tokens: {input_tokens} in / {output_tokens} out | turns: {len(messages) // 2}]\n")
 
 
