@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+{% block title %}Chat — Placement Prep AI{% endblock %}
+{% block content %}
+<div class="chat-page d-flex" style="height:calc(100vh - 56px)">
+
+  <!-- Sidebar -->
+  <aside class="chat-sidebar d-none d-lg-flex flex-column p-3 gap-3">
+    <div>
+      <div class="sidebar-label">Model</div>
+      <div class="sidebar-value"><i class="fa-solid fa-bolt text-warning me-1"></i>Gemini 2.5 Flash</div>
+    </div>
+    <hr class="my-1">
+    <div>
+      <div class="sidebar-label">Session Stats</div>
+      <div class="stat-row"><span>Turns</span><span id="sb-turns">0</span></div>
+      <div class="stat-row"><span>Tokens In</span><span id="sb-tok-in">0</span></div>
+      <div class="stat-row"><span>Tokens Out</span><span id="sb-tok-out">0</span></div>
+      <div class="stat-row"><span>Session Cost</span><span id="sb-cost">$0.00000</span></div>
+    </div>
+    <hr class="my-1">
+    <div>
+      <div class="sidebar-label">Context Used</div>
+      <div class="progress mt-2" style="height:6px">
+        <div class="progress-bar bg-accent" id="ctx-bar" style="width:0%"></div>
+      </div>
+      <div class="text-muted small mt-1" id="ctx-pct">0.000% of 1,048,576 tokens</div>
+    </div>
+    <div class="mt-auto">
+      <button class="btn btn-outline-danger btn-sm w-100" onclick="clearChat()">
+        <i class="fa-solid fa-trash me-1"></i>Clear Session
+      </button>
+    </div>
+  </aside>
+
+  <!-- Chat main -->
+  <div class="chat-main d-flex flex-column flex-grow-1">
+    <div class="chat-messages flex-grow-1 p-3 p-lg-4" id="chatMessages">
+      <div class="chat-welcome text-center py-5">
+        <div class="welcome-icon mb-3"><i class="fa-solid fa-robot"></i></div>
+        <h5>Placement Advisor</h5>
+        <p class="text-muted">Ask me anything about interview prep, companies, or career advice for Indian tech companies.</p>
+        <div class="suggestion-chips">
+          <button class="chip" onclick="sendSuggestion(this)">What to prepare for Wipro SDE-1?</button>
+          <button class="chip" onclick="sendSuggestion(this)">Difference between TCS and Infosys interviews</button>
+          <button class="chip" onclick="sendSuggestion(this)">Top DSA topics for product companies</button>
+          <button class="chip" onclick="sendSuggestion(this)">How to answer "Tell me about yourself"</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Input bar -->
+    <div class="chat-input-bar p-3">
+      <form id="chatForm" class="d-flex gap-2 align-items-end">
+        <div class="flex-grow-1 position-relative">
+          <textarea id="chatInput" class="form-control chat-textarea" rows="1"
+            placeholder="Ask about any company, role, or interview topic..." maxlength="1000"></textarea>
+          <div class="char-count" id="charCount">0/1000</div>
+        </div>
+        <button type="submit" class="btn btn-accent send-btn" id="sendBtn">
+          <i class="fa-solid fa-paper-plane"></i>
+        </button>
+      </form>
+      <div class="text-muted small mt-1 text-center">Press <kbd>Ctrl+Enter</kbd> to send</div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const CONTEXT_WINDOW = 1048576;
+let totalTokIn = 0, totalTokOut = 0;
+
+const chatMessages = document.getElementById('chatMessages');
+const chatInput    = document.getElementById('chatInput');
+const sendBtn      = document.getElementById('sendBtn');
+
+// Auto-resize textarea
+chatInput.addEventListener('input', () => {
+  chatInput.style.height = 'auto';
+  chatInput.style.height = Math.min(chatInput.scrollHeight, 160) + 'px';
+  document.getElementById('charCount').textContent = chatInput.value.length + '/1000';
+});
+
+// Ctrl+Enter to send
+chatInput.addEventListener('keydown', e => {
+  if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); submitChat(); }
+});
+
+document.getElementById('chatForm').addEventListener('submit', e => { e.preventDefault(); submitChat(); });
+
+function sendSuggestion(btn) {
+  chatInput.value = btn.textContent;
+  submitChat();
+}
+
+async function submitChat() {
+  const msg = chatInput.value.trim();
+  if (!msg) return;
+
+  // Hide welcome, add user bubble
+  document.querySelector('.chat-welcome')?.remove();
+  appendBubble('user', msg);
+  chatInput.value = '';
+  chatInput.style.height = 'auto';
+
+  // Thinking indicator
+  const thinkId = appendThinking();
+  setLoading(true);
+
+  try {
+    const res  = await fetch('/api/chat/send', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ message: msg })
+    });
+    const data = await res.json();
+    removeThinking(thinkId);
+
+    if (data.error) { appendError(data.error); return; }
+
+    appendBubble('ai', data.reply, data.tok_in, data.tok_out, data.cost);
+
+    // Update sidebar
+    totalTokIn  += data.tok_in;
+    totalTokOut += data.tok_out;
+    document.getElementById('sb-turns').textContent   = data.turns;
+    document.getElementById('sb-tok-in').textContent  = totalTokIn.toLocaleString();
+    document.getElementById('sb-tok-out').textContent = totalTokOut.toLocaleString();
+    document.getElementById('sb-cost').textContent    = '$' + data.total_cost.toFixed(5);
+    const pct = (data.tok_in / CONTEXT_WINDOW * 100);
+    document.getElementById('ctx-bar').style.width = pct + '%';
+    document.getElementById('ctx-bar').className   = 'progress-bar ' + (pct > 80 ? 'bg-danger' : pct > 50 ? 'bg-warning' : 'bg-accent');
+    document.getElementById('ctx-pct').textContent = pct.toFixed(3) + '% of 1,048,576 tokens';
+  } catch(e) {
+    removeThinking(thinkId);
+    appendError('Network error. Try again.');
+  } finally {
+    setLoading(false);
+  }
+}
+
+function appendBubble(role, text, tokIn, tokOut, cost) {
+  const wrap = document.createElement('div');
+  wrap.className = 'msg-wrap ' + (role === 'user' ? 'user' : 'ai');
+
+  const bubble = document.createElement('div');
+  bubble.className = 'msg-bubble';
+
+  if (role === 'ai') {
+    bubble.innerHTML = marked.parse(text);
+    if (tokIn) {
+      const meta = document.createElement('div');
+      meta.className = 'msg-meta';
+      meta.innerHTML = `<i class="fa-solid fa-coins me-1"></i>${tokIn} in / ${tokOut} out &nbsp;·&nbsp; $${cost.toFixed(5)}`;
+      wrap.appendChild(bubble);
+      wrap.appendChild(meta);
+      chatMessages.appendChild(wrap);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+      return;
+    }
+  } else {
+    bubble.textContent = text;
+  }
+  wrap.appendChild(bubble);
+  chatMessages.appendChild(wrap);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function appendThinking() {
+  const id = 'think-' + Date.now();
+  const wrap = document.createElement('div');
+  wrap.className = 'msg-wrap ai'; wrap.id = id;
+  wrap.innerHTML = `<div class="msg-bubble thinking"><span></span><span></span><span></span></div>`;
+  chatMessages.appendChild(wrap);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+  return id;
+}
+
+function removeThinking(id) {
+  document.getElementById(id)?.remove();
+}
+
+function appendError(msg) {
+  const div = document.createElement('div');
+  div.className = 'alert alert-danger mx-2 my-2 py-2';
+  div.innerHTML = `<i class="fa-solid fa-triangle-exclamation me-2"></i>${msg}`;
+  chatMessages.appendChild(div);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function setLoading(on) {
+  sendBtn.disabled = on;
+  sendBtn.innerHTML = on
+    ? '<div class="spinner-border spinner-border-sm"></div>'
+    : '<i class="fa-solid fa-paper-plane"></i>';
+}
+
+async function clearChat() {
+  if (!confirm('Clear this session?')) return;
+  await fetch('/api/chat/clear', { method: 'POST' });
+  chatMessages.innerHTML = '';
+  totalTokIn = totalTokOut = 0;
+  ['sb-turns','sb-tok-in','sb-tok-out'].forEach(id => document.getElementById(id).textContent = '0');
+  document.getElementById('sb-cost').textContent = '$0.00000';
+  document.getElementById('ctx-bar').style.width = '0%';
+  document.getElementById('ctx-pct').textContent = '0.000% of 1,048,576 tokens';
+  location.reload();
+}
+</script>
+{% endblock %}

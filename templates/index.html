@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}Home — Placement Prep AI{% endblock %}
+{% block content %}
+
+<!-- Hero -->
+<section class="hero-section">
+  <div class="container">
+    <div class="row align-items-center min-vh-80">
+      <div class="col-lg-7">
+        <div class="badge-pill mb-3"><i class="fa-solid fa-circle-dot text-success me-2"></i>Live · Powered by Gemini 2.5 Flash</div>
+        <h1 class="hero-title">Crack Your Dream<br><span class="text-gradient">Tech Interview</span></h1>
+        <p class="hero-sub">AI-powered interview preparation built for Indian engineering students. Research companies, practice with a live interviewer, and track your progress — all in one place.</p>
+        <div class="d-flex gap-3 flex-wrap mt-4">
+          <a href="/interview" class="btn btn-accent btn-lg"><i class="fa-solid fa-microphone me-2"></i>Start Mock Interview</a>
+          <a href="/research" class="btn btn-outline-secondary btn-lg"><i class="fa-solid fa-magnifying-glass me-2"></i>Research a Company</a>
+        </div>
+        <div class="hero-stats mt-5">
+          <div class="stat"><span class="stat-num">6</span><span class="stat-label">Scripts Built</span></div>
+          <div class="stat"><span class="stat-num">5</span><span class="stat-label">Questions / Session</span></div>
+          <div class="stat"><span class="stat-num">3</span><span class="stat-label">Prompt Techniques</span></div>
+          <div class="stat"><span class="stat-num">W1</span><span class="stat-label">Complete</span></div>
+        </div>
+      </div>
+      <div class="col-lg-5 d-none d-lg-block">
+        <div class="hero-card">
+          <div class="hero-card-bar"><span></span><span></span><span></span></div>
+          <div class="hero-card-body">
+            <div class="chat-bubble ai">
+              <i class="fa-solid fa-robot me-2 text-accent"></i>
+              Welcome! Which company are you preparing for?
+            </div>
+            <div class="chat-bubble user">Wipro SDE-1 interview</div>
+            <div class="chat-bubble ai">
+              <i class="fa-solid fa-robot me-2 text-accent"></i>
+              Great choice! Wipro typically has 3 rounds: Online Test, Technical Interview, and HR. Let me ask you the first question...
+            </div>
+            <div class="typing-indicator"><span></span><span></span><span></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section class="section-pad">
+  <div class="container">
+    <div class="section-header text-center mb-5">
+      <h2 class="section-title">Everything You Need to Prepare</h2>
+      <p class="text-muted">Three tools. One goal: get the offer.</p>
+    </div>
+    <div class="row g-4">
+      <div class="col-md-4">
+        <div class="feature-card h-100">
+          <div class="feature-icon"><i class="fa-solid fa-message"></i></div>
+          <h5>AI Chat Advisor</h5>
+          <p class="text-muted">Ask anything about any company or role. Get targeted advice from an AI trained on placement patterns across Indian tech companies.</p>
+          <ul class="feature-list">
+            <li>Multi-turn conversation</li>
+            <li>Token usage tracking</li>
+            <li>Session history saved</li>
+          </ul>
+          <a href="/chat" class="btn btn-sm btn-outline-accent mt-3">Open Chat <i class="fa-solid fa-arrow-right ms-1"></i></a>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="feature-card h-100 featured">
+          <div class="badge-featured">Most Used</div>
+          <div class="feature-icon accent"><i class="fa-solid fa-microphone"></i></div>
+          <h5>Mock Interview Coach</h5>
+          <p class="text-muted">5-question interview simulation with real-time feedback. See ideal answers before you try. Get a full performance report at the end.</p>
+          <ul class="feature-list">
+            <li>Company-specific questions</li>
+            <li>Instant feedback per answer</li>
+            <li>Score with topic breakdown</li>
+          </ul>
+          <a href="/interview" class="btn btn-sm btn-accent mt-3">Start Interview <i class="fa-solid fa-arrow-right ms-1"></i></a>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="feature-card h-100">
+          <div class="feature-icon"><i class="fa-solid fa-magnifying-glass"></i></div>
+          <h5>Company Research</h5>
+          <p class="text-muted">Get structured profiles on any company — tech stack, typical roles, interview difficulty. Compare how different prompt techniques affect output quality.</p>
+          <ul class="feature-list">
+            <li>Company profile (JSON)</li>
+            <li>Zero-shot vs Few-shot vs CoT</li>
+            <li>Interview difficulty rating</li>
+          </ul>
+          <a href="/research" class="btn btn-sm btn-outline-accent mt-3">Research Now <i class="fa-solid fa-arrow-right ms-1"></i></a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Progress tracker -->
+<section class="section-pad bg-card-subtle">
+  <div class="container">
+    <div class="section-header text-center mb-5">
+      <h2 class="section-title">8-Week Progress</h2>
+      <p class="text-muted">Building from raw API calls to a live deployed app.</p>
+    </div>
+    <div class="row g-3">
+      {% set weeks = [
+        ("1", "Claude API + Python", "Terminal Interview Coach", "complete"),
+        ("2", "LangChain + Tools + Tavily", "Company Research Chain", "active"),
+        ("3", "Embeddings + ChromaDB + RAG", "Company Intelligence Store", "upcoming"),
+        ("4", "LangGraph + State Machines", "ReAct Agent", "upcoming"),
+        ("5", "Multi-Agent + Streamlit", "Full Supervisor System", "upcoming"),
+        ("6", "Integration + Testing", "Tested Codebase", "upcoming"),
+        ("7", "Docker + CI/CD", "Containerized Pipeline", "upcoming"),
+        ("8", "Cloud Deploy + Monitoring", "Live Production App", "upcoming"),
+      ] %}
+      {% for num, focus, deliverable, status in weeks %}
+      <div class="col-sm-6 col-lg-3">
+        <div class="week-card {{ status }}">
+          <div class="week-num">Week {{ num }}</div>
+          <div class="week-focus">{{ focus }}</div>
+          <div class="week-deliverable"><i class="fa-solid fa-box me-1"></i>{{ deliverable }}</div>
+          <div class="week-status">
+            {% if status == 'complete' %}<i class="fa-solid fa-circle-check text-success"></i> Complete
+            {% elif status == 'active' %}<i class="fa-solid fa-circle-dot text-warning"></i> In Progress
+            {% else %}<i class="fa-regular fa-circle text-muted"></i> Upcoming
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- Tech stack -->
+<section class="section-pad">
+  <div class="container">
+    <div class="text-center mb-4">
+      <h2 class="section-title">Tech Stack</h2>
+    </div>
+    <div class="tech-pills justify-content-center">
+      {% for icon, name, color in [
+        ("fa-brands fa-python","Python 3.11","#3572A5"),
+        ("fa-solid fa-bolt","Gemini 2.5 Flash","#4285F4"),
+        ("fa-solid fa-link","LangChain","#1C3A2E"),
+        ("fa-solid fa-database","ChromaDB","#FF6B35"),
+        ("fa-solid fa-diagram-project","LangGraph","#7C3AED"),
+        ("fa-brands fa-docker","Docker","#2496ED"),
+        ("fa-brands fa-github","GitHub Actions","#24292E"),
+      ] %}
+      <div class="tech-pill">
+        <i class="{{ icon }}" style="color:{{ color }}"></i>
+        <span>{{ name }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{% endblock %}

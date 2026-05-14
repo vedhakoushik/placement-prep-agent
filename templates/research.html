@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+{% block title %}Research — Placement Prep AI{% endblock %}
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-lg-9">
+
+      <!-- Header -->
+      <div class="text-center mb-5">
+        <h2 class="section-title"><i class="fa-solid fa-magnifying-glass text-accent me-2"></i>Company Research</h2>
+        <p class="text-muted">Structured profiles · Zero-shot vs Few-shot vs CoT · Interview difficulty</p>
+      </div>
+
+      <!-- Search bar -->
+      <div class="card app-card mb-4">
+        <div class="card-body p-4">
+          <label class="form-label">Company Name</label>
+          <div class="d-flex gap-2">
+            <input type="text" id="company-input" class="form-control app-input flex-grow-1"
+              placeholder="e.g. Wipro, TCS, Infosys, Google, Microsoft">
+            <button class="btn btn-accent" onclick="runProfile()" id="profile-btn">
+              <i class="fa-solid fa-circle-info me-1"></i>Get Profile
+            </button>
+            <button class="btn btn-outline-accent" onclick="runCompare()" id="compare-btn">
+              <i class="fa-solid fa-code-compare me-1"></i>Compare Prompts
+            </button>
+          </div>
+          <div id="research-error" class="alert alert-danger mt-3 d-none"></div>
+        </div>
+      </div>
+
+      <!-- Company Profile -->
+      <div id="profile-section" class="d-none">
+        <div class="card app-card mb-4">
+          <div class="card-body p-4">
+            <div class="d-flex justify-content-between align-items-start mb-4">
+              <div>
+                <h5 class="mb-1" id="profile-name">Company</h5>
+                <span class="text-muted small" id="profile-meta"></span>
+              </div>
+              <span class="badge fs-6" id="difficulty-badge"></span>
+            </div>
+
+            <div class="row g-3 mb-4">
+              <div class="col-md-6">
+                <div class="profile-stat-card">
+                  <div class="profile-stat-label"><i class="fa-solid fa-location-dot me-1"></i>HQ</div>
+                  <div class="profile-stat-value" id="profile-hq">—</div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="profile-stat-card">
+                  <div class="profile-stat-label"><i class="fa-solid fa-calendar me-1"></i>Founded</div>
+                  <div class="profile-stat-value" id="profile-founded">—</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <div class="profile-stat-label mb-2"><i class="fa-solid fa-star me-1"></i>Known For</div>
+              <p class="text-muted mb-0" id="profile-known"></p>
+            </div>
+
+            <div class="row g-3">
+              <div class="col-md-6">
+                <div class="profile-stat-label mb-2"><i class="fa-solid fa-laptop-code me-1"></i>Tech Stack</div>
+                <div id="profile-stack" class="d-flex flex-wrap gap-2"></div>
+              </div>
+              <div class="col-md-6">
+                <div class="profile-stat-label mb-2"><i class="fa-solid fa-user-tie me-1"></i>Typical Roles</div>
+                <div id="profile-roles" class="d-flex flex-wrap gap-2"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Prompt Comparison -->
+      <div id="compare-section" class="d-none">
+        <h5 class="mb-3"><i class="fa-solid fa-code-compare me-2 text-accent"></i>Prompt Technique Comparison</h5>
+        <div class="row g-3">
+          <div class="col-md-4">
+            <div class="card app-card h-100">
+              <div class="card-body p-4">
+                <div class="d-flex align-items-center gap-2 mb-3">
+                  <span class="technique-badge zero">0-shot</span>
+                  <span class="fw-semibold">Zero-Shot</span>
+                </div>
+                <p class="text-muted small mb-3">Direct question, no examples. Fast but less structured.</p>
+                <div id="zero-shot-text" class="compare-text text-muted small"></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card app-card h-100">
+              <div class="card-body p-4">
+                <div class="d-flex align-items-center gap-2 mb-3">
+                  <span class="technique-badge few">few-shot</span>
+                  <span class="fw-semibold">Few-Shot</span>
+                </div>
+                <p class="text-muted small mb-3">Examples included in prompt. More consistent format.</p>
+                <div id="few-shot-text" class="compare-text text-muted small"></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card app-card h-100">
+              <div class="card-body p-4">
+                <div class="d-flex align-items-center gap-2 mb-3">
+                  <span class="technique-badge cot">CoT</span>
+                  <span class="fw-semibold">Chain-of-Thought</span>
+                </div>
+                <p class="text-muted small mb-3">Step-by-step reasoning. Most comprehensive output.</p>
+                <div id="cot-text" class="compare-text text-muted small"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="compare-loading" class="text-center py-4 d-none">
+          <div class="spinner-border text-accent" role="status"></div>
+          <div class="text-muted mt-2 small">Running 3 prompts with delays to respect rate limits...</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function runProfile() {
+  const company = document.getElementById('company-input').value.trim();
+  if (!company) { showError('Enter a company name.'); return; }
+
+  const btn = document.getElementById('profile-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner-border spinner-border-sm me-1"></div>Loading...';
+
+  try {
+    const res  = await fetch('/api/research/profile', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ company })
+    });
+    const data = await res.json();
+    if (data.error) { showError(data.error); return; }
+
+    renderProfile(data.profile);
+    document.getElementById('profile-section').classList.remove('d-none');
+  } catch(e) {
+    showError('Network error.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-circle-info me-1"></i>Get Profile';
+  }
+}
+
+function renderProfile(p) {
+  document.getElementById('profile-name').textContent = p.company || '—';
+  document.getElementById('profile-meta').textContent = `Founded ${p.founded || '—'} · ${p.hq || '—'}`;
+  document.getElementById('profile-hq').textContent = p.hq || '—';
+  document.getElementById('profile-founded').textContent = p.founded || '—';
+  document.getElementById('profile-known').textContent = p.known_for || '—';
+
+  const diff = p.interview_difficulty || 'medium';
+  const badge = document.getElementById('difficulty-badge');
+  badge.textContent = diff.charAt(0).toUpperCase() + diff.slice(1) + ' difficulty';
+  badge.className = 'badge fs-6 ' + (diff === 'hard' ? 'bg-danger' : diff === 'easy' ? 'bg-success' : 'bg-warning text-dark');
+
+  const stackEl = document.getElementById('profile-stack');
+  stackEl.innerHTML = '';
+  (p.tech_stack || []).forEach(t => {
+    stackEl.innerHTML += `<span class="tech-tag">${t}</span>`;
+  });
+
+  const rolesEl = document.getElementById('profile-roles');
+  rolesEl.innerHTML = '';
+  (p.typical_roles || []).forEach(r => {
+    rolesEl.innerHTML += `<span class="role-tag">${r}</span>`;
+  });
+}
+
+async function runCompare() {
+  const company = document.getElementById('company-input').value.trim();
+  if (!company) { showError('Enter a company name.'); return; }
+
+  const btn = document.getElementById('compare-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner-border spinner-border-sm me-1"></div>Running...';
+
+  document.getElementById('compare-section').classList.remove('d-none');
+  document.getElementById('compare-loading').classList.remove('d-none');
+  ['zero-shot-text','few-shot-text','cot-text'].forEach(id => {
+    document.getElementById(id).innerHTML = '';
+  });
+
+  try {
+    const res  = await fetch('/api/research/compare', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ company })
+    });
+    const data = await res.json();
+
+    document.getElementById('zero-shot-text').innerHTML = marked.parse(data.zero_shot || '');
+    document.getElementById('few-shot-text').innerHTML  = marked.parse(data.few_shot  || '');
+    document.getElementById('cot-text').innerHTML       = marked.parse(data.cot       || '');
+  } catch(e) {
+    showError('Network error during comparison.');
+  } finally {
+    document.getElementById('compare-loading').classList.add('d-none');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-code-compare me-1"></i>Compare Prompts';
+  }
+}
+
+function showError(msg) {
+  const el = document.getElementById('research-error');
+  el.textContent = msg;
+  el.classList.remove('d-none');
+  setTimeout(() => el.classList.add('d-none'), 5000);
+}
+</script>
+{% endblock %}

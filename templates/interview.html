@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+{% block title %}Interview Coach — Placement Prep AI{% endblock %}
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+
+      <!-- Header -->
+      <div class="text-center mb-5">
+        <h2 class="section-title"><i class="fa-solid fa-microphone text-accent me-2"></i>Mock Interview Coach</h2>
+        <p class="text-muted">5 targeted questions · real-time feedback · performance score</p>
+      </div>
+
+      <!-- Step 1: Setup -->
+      <div id="step-setup" class="card app-card">
+        <div class="card-body p-4">
+          <h5 class="mb-4"><i class="fa-solid fa-sliders me-2 text-accent"></i>Interview Setup</h5>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Company</label>
+              <input type="text" id="company" class="form-control app-input" placeholder="e.g. Wipro, TCS, Infosys">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Role</label>
+              <input type="text" id="role" class="form-control app-input" placeholder="e.g. SDE-1, Intern, Analyst">
+            </div>
+          </div>
+          <div class="mt-4">
+            <div class="mb-3 text-muted small"><i class="fa-solid fa-circle-info me-1"></i>During the interview: type <kbd>a</kbd> to see the ideal answer first, <kbd>s</kbd> to skip.</div>
+            <button class="btn btn-accent btn-lg w-100" onclick="startInterview()">
+              <i class="fa-solid fa-play me-2"></i>Start Interview
+            </button>
+          </div>
+          <div id="setup-error" class="alert alert-danger mt-3 d-none"></div>
+        </div>
+      </div>
+
+      <!-- Step 2: Interview -->
+      <div id="step-interview" class="d-none">
+        <!-- Progress -->
+        <div class="card app-card mb-3">
+          <div class="card-body py-3 px-4">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="text-muted small">Question <span id="q-current">1</span> of <span id="q-total">5</span></span>
+              <span class="badge bg-accent" id="company-badge"></span>
+            </div>
+            <div class="progress" style="height:6px">
+              <div class="progress-bar bg-accent" id="q-progress" style="width:0%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Interviewer message -->
+        <div class="card app-card mb-3">
+          <div class="card-body p-4">
+            <div class="d-flex gap-3">
+              <div class="interviewer-avatar"><i class="fa-solid fa-robot"></i></div>
+              <div class="flex-grow-1">
+                <div class="fw-semibold mb-2 text-accent">Interviewer</div>
+                <div id="interviewer-msg" class="interviewer-text"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Ideal answer (hidden by default) -->
+        <div id="ideal-section" class="card app-card mb-3 d-none border-warning">
+          <div class="card-body p-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <span class="fw-semibold text-warning"><i class="fa-solid fa-lightbulb me-2"></i>Ideal Answer</span>
+              <button class="btn btn-sm btn-outline-secondary" onclick="hideIdeal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="ideal-text" class="text-muted"></div>
+          </div>
+        </div>
+
+        <!-- Answer input -->
+        <div class="card app-card mb-3" id="answer-card">
+          <div class="card-body p-4">
+            <label class="form-label text-muted small mb-2">Your Answer</label>
+            <textarea id="answer-input" class="form-control app-input" rows="4"
+              placeholder="Type your answer here... (or 'a' for ideal answer, 's' to skip)"></textarea>
+            <div class="d-flex gap-2 mt-3">
+              <button class="btn btn-outline-warning btn-sm" onclick="getIdealAnswer()" id="ideal-btn">
+                <i class="fa-solid fa-lightbulb me-1"></i>Show Ideal Answer
+              </button>
+              <button class="btn btn-accent ms-auto" onclick="submitAnswer()" id="submit-answer-btn">
+                Submit Answer <i class="fa-solid fa-arrow-right ms-1"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div id="interview-error" class="alert alert-danger d-none"></div>
+      </div>
+
+      <!-- Step 3: Summary -->
+      <div id="step-summary" class="d-none">
+        <div class="card app-card mb-4">
+          <div class="card-body p-4 text-center">
+            <div class="summary-score-ring mb-3" id="score-ring">
+              <span id="score-num">—</span><small>/10</small>
+            </div>
+            <h4 id="summary-title" class="mb-1"></h4>
+            <span class="badge fs-6" id="verdict-badge"></span>
+          </div>
+        </div>
+        <div class="row g-3 mb-4">
+          <div class="col-md-6">
+            <div class="card app-card h-100">
+              <div class="card-body p-4">
+                <h6 class="text-success mb-3"><i class="fa-solid fa-circle-check me-2"></i>Strengths</h6>
+                <ul class="summary-list" id="strengths-list"></ul>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card app-card h-100">
+              <div class="card-body p-4">
+                <h6 class="text-warning mb-3"><i class="fa-solid fa-arrow-trend-up me-2"></i>Improve</h6>
+                <ul class="summary-list" id="improvements-list"></ul>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card app-card mb-4">
+          <div class="card-body p-4">
+            <h6 class="mb-3">Topic Scores</h6>
+            <div id="topic-scores"></div>
+          </div>
+        </div>
+        <button class="btn btn-accent w-100" onclick="resetInterview()">
+          <i class="fa-solid fa-rotate me-2"></i>Start New Interview
+        </button>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentQ = 0, totalQ = 5;
+
+async function startInterview() {
+  const company = document.getElementById('company').value.trim();
+  const role    = document.getElementById('role').value.trim();
+  if (!company || !role) { showError('setup-error','Enter both company and role.'); return; }
+
+  const btn = event.target;
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner-border spinner-border-sm me-2"></div>Starting...';
+
+  try {
+    const res  = await fetch('/api/interview/start', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({company, role})
+    });
+    const data = await res.json();
+    if (data.error) { showError('setup-error', data.error); return; }
+
+    document.getElementById('step-setup').classList.add('d-none');
+    document.getElementById('step-interview').classList.remove('d-none');
+    document.getElementById('company-badge').textContent = company + ' · ' + role;
+    document.getElementById('q-total').textContent = data.total;
+    totalQ = data.total;
+    setQuestion(data.reply, 1);
+  } catch(e) {
+    showError('setup-error', 'Network error.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-play me-2"></i>Start Interview';
+  }
+}
+
+function setQuestion(text, qNum) {
+  currentQ = qNum;
+  document.getElementById('q-current').textContent = qNum;
+  document.getElementById('q-progress').style.width = ((qNum-1)/totalQ*100) + '%';
+  const el = document.getElementById('interviewer-msg');
+  el.innerHTML = marked.parse(text);
+  document.getElementById('answer-input').value = '';
+  document.getElementById('ideal-section').classList.add('d-none');
+  document.getElementById('answer-card').classList.remove('d-none');
+  document.getElementById('answer-input').focus();
+}
+
+async function getIdealAnswer() {
+  const btn = document.getElementById('ideal-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner-border spinner-border-sm me-1"></div>Loading...';
+
+  const res  = await fetch('/api/interview/ideal', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
+  const data = await res.json();
+
+  document.getElementById('ideal-text').innerHTML = marked.parse(data.ideal || data.error || '');
+  document.getElementById('ideal-section').classList.remove('d-none');
+  btn.disabled = false;
+  btn.innerHTML = '<i class="fa-solid fa-lightbulb me-1"></i>Show Ideal Answer';
+}
+
+function hideIdeal() {
+  document.getElementById('ideal-section').classList.add('d-none');
+}
+
+async function submitAnswer() {
+  let answer = document.getElementById('answer-input').value.trim();
+  if (answer.toLowerCase() === 's' || !answer) answer = '(skipped)';
+
+  const btn = document.getElementById('submit-answer-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner-border spinner-border-sm me-2"></div>Submitting...';
+
+  try {
+    const res  = await fetch('/api/interview/answer', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({answer})
+    });
+    const data = await res.json();
+    if (data.error) { showError('interview-error', data.error); return; }
+
+    if (data.done) {
+      document.getElementById('step-interview').classList.add('d-none');
+      document.getElementById('step-summary').classList.remove('d-none');
+      renderSummary(data.summary);
+    } else {
+      setQuestion(data.reply, data.q_num);
+      document.getElementById('q-progress').style.width = ((data.q_num-1)/totalQ*100) + '%';
+    }
+  } catch(e) {
+    showError('interview-error','Network error.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Submit Answer <i class="fa-solid fa-arrow-right ms-1"></i>';
+  }
+}
+
+function renderSummary(s) {
+  if (!s || !s.overall_score) {
+    document.getElementById('summary-title').textContent = 'Interview Complete';
+    document.getElementById('verdict-badge').textContent = 'Results unavailable';
+    return;
+  }
+  const score = s.overall_score;
+  const ring  = document.getElementById('score-ring');
+  ring.style.setProperty('--score-color', score >= 7 ? '#10B981' : score >= 5 ? '#F59E0B' : '#EF4444');
+  document.getElementById('score-num').textContent = score;
+  document.getElementById('summary-title').textContent = document.getElementById('company-badge').textContent;
+
+  const badge = document.getElementById('verdict-badge');
+  badge.textContent = s.recommendation;
+  badge.className   = 'badge fs-6 ' + (s.recommendation === 'Ready' ? 'bg-success' : s.recommendation === 'Not ready' ? 'bg-danger' : 'bg-warning text-dark');
+
+  const ul = id => document.getElementById(id);
+  (s.strengths || []).forEach(t => ul('strengths-list').innerHTML += `<li>${t}</li>`);
+  (s.improvements || []).forEach(t => ul('improvements-list').innerHTML += `<li>${t}</li>`);
+
+  const topicEl = document.getElementById('topic-scores');
+  Object.entries(s.topic_scores || {}).forEach(([topic, score]) => {
+    topicEl.innerHTML += `
+      <div class="d-flex align-items-center gap-3 mb-3">
+        <div style="width:60px" class="text-muted small">${topic}</div>
+        <div class="progress flex-grow-1" style="height:10px">
+          <div class="progress-bar" style="width:${score*10}%;background:${score>=7?'#10B981':score>=5?'#F59E0B':'#EF4444'}"></div>
+        </div>
+        <div style="width:40px" class="text-end small fw-semibold">${score}/10</div>
+      </div>`;
+  });
+}
+
+function resetInterview() {
+  document.getElementById('step-setup').classList.remove('d-none');
+  document.getElementById('step-interview').classList.add('d-none');
+  document.getElementById('step-summary').classList.add('d-none');
+  document.getElementById('company').value = '';
+  document.getElementById('role').value    = '';
+  document.getElementById('strengths-list').innerHTML = '';
+  document.getElementById('improvements-list').innerHTML = '';
+  document.getElementById('topic-scores').innerHTML = '';
+}
+
+function showError(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.classList.remove('d-none');
+  setTimeout(() => el.classList.add('d-none'), 5000);
+}
+</script>
+{% endblock %}
