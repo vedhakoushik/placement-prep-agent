@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.urandom(24)
+app.secret_key = os.getenv("FLASK_SECRET_KEY") or "placement-prep-dev-key-change-in-prod"
 
 # ── Gemini config ─────────────────────────────────────────────────────────────
 MODEL   = "gemini-2.5-flash"
@@ -85,8 +85,16 @@ def chat_send():
     if not sid or sid not in _store:
         return jsonify({"error": "No session"}), 400
 
+    msg = (data.get("message") or "").strip()
+    if not msg or len(msg) > 1000:
+        return jsonify({"error": "Message must be 1–1000 characters."}), 400
+
     store = _store[sid]
-    store["messages"].append(u(data["message"]))
+    store["messages"].append(u(msg))
+
+    # Keep history bounded to avoid context overflow
+    if len(store["messages"]) > 40:
+        store["messages"] = store["messages"][-40:]
 
     result = gemini(store["messages"], system=PLACEMENT_SYSTEM)
     if "error" in result:
@@ -118,8 +126,10 @@ def chat_clear():
 @app.route("/api/interview/start", methods=["POST"])
 def interview_start():
     data    = request.json
-    company = data.get("company", "").strip()
-    role    = data.get("role", "").strip()
+    company = (data.get("company") or "").strip()
+    role    = (data.get("role") or "").strip()
+    if not company or not role or len(company) > 100 or len(role) > 100:
+        return jsonify({"error": "Company and role are required (max 100 chars each)."}), 400
     sid     = str(uuid.uuid4())
     session["isid"] = sid
 
@@ -146,7 +156,10 @@ def interview_answer():
     if not store:
         return jsonify({"error": "No interview session"}), 400
 
-    answer  = request.json.get("answer", "(skipped)").strip() or "(skipped)"
+    answer  = (request.json.get("answer") or "").strip()
+    if len(answer) > 3000:
+        return jsonify({"error": "Answer too long (max 3000 characters)."}), 400
+    answer  = answer or "(skipped)"
     q_num   = store["q_num"]
     total   = store["total_questions"]
     company = store["company"]
@@ -215,7 +228,9 @@ Return ONLY valid JSON:
 # ── Research API ──────────────────────────────────────────────────────────────
 @app.route("/api/research/profile", methods=["POST"])
 def research_profile():
-    company = request.json.get("company", "").strip()
+    company = (request.json.get("company") or "").strip()
+    if not company or len(company) > 100:
+        return jsonify({"error": "Company name required (max 100 chars)."}), 400
     prompt  = f"""Return ONLY a JSON object for {company}:
 {{"company":"","founded":"","hq":"","tech_stack":[],"known_for":"","typical_roles":[],"interview_difficulty":"easy|medium|hard"}}"""
     result = gemini([u(prompt)],
@@ -231,17 +246,20 @@ def research_profile():
 
 @app.route("/api/research/compare", methods=["POST"])
 def research_compare():
-    company = request.json.get("company", "").strip()
+    company = (request.json.get("company") or "").strip()
+    if not company or len(company) > 100:
+        return jsonify({"error": "Company name required (max 100 chars)."}), 400
     results = {}
     prompts = {
         "zero_shot": f"What is the interview process at {company} for a fresher software engineer? Answer in 5 bullet points.",
         "few_shot":  f"Company: TCS — 3 rounds: online test, technical, HR.\nCompany: Infosys — 3 rounds: InfyTQ test, technical, HR.\nNow same format for:\nCompany: {company} —",
         "cot":       f"Think step by step:\n1. What kind of company is {company}?\n2. What does that tell us about interviews?\n3. What should a fresher focus on?\n4. Final preparation plan.",
     }
-    for key, prompt in prompts.items():
+    for i, (key, prompt) in enumerate(prompts.items()):
+        if i > 0:
+            time.sleep(6)  # only sleep between calls, not after the last one
         r = gemini([u(prompt)], max_tokens=400)
         results[key] = r.get("text", r.get("error", ""))
-        time.sleep(6)
     return jsonify(results)
 
 

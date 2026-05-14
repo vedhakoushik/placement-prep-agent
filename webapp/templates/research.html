@@ -201,9 +201,9 @@ async function runCompare() {
     });
     const data = await res.json();
 
-    document.getElementById('zero-shot-text').innerHTML = marked.parse(data.zero_shot || '');
-    document.getElementById('few-shot-text').innerHTML  = marked.parse(data.few_shot  || '');
-    document.getElementById('cot-text').innerHTML       = marked.parse(data.cot       || '');
+    document.getElementById('zero-shot-text').innerHTML = safeMarkdown(data.zero_shot || '');
+    document.getElementById('few-shot-text').innerHTML  = safeMarkdown(data.few_shot  || '');
+    document.getElementById('cot-text').innerHTML       = safeMarkdown(data.cot       || '');
   } catch(e) {
     showError('Network error during comparison.');
   } finally {

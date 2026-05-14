@@ -147,7 +147,7 @@ function appendBubble(role, text, tokIn, tokOut, cost) {
   bubble.className = 'msg-bubble';
 
   if (role === 'ai') {
-    bubble.innerHTML = marked.parse(text);
+    bubble.innerHTML = safeMarkdown(text);
     if (tokIn) {
       const meta = document.createElement('div');
       meta.className = 'msg-meta';
