@@ -1,17 +1,9 @@
-import httpx
 import json
 import os
-import time
 from datetime import datetime
-from dotenv import load_dotenv
+from gemini_client import call_text, user_msg, model_msg
 
-load_dotenv()
-
-API_KEY = os.getenv("GEMINI_API_KEY")
-MODEL = "gemini-2.5-flash"
-API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent?key={API_KEY}"
-
-SYSTEM_PROMPT = """You are a strict but encouraging technical interviewer for top tech companies in India.
+SYSTEM = """You are a strict but encouraging technical interviewer for top tech companies in India.
 
 Your behaviour:
 - Ask ONE question at a time. Wait for the candidate's answer before asking the next.
@@ -21,30 +13,11 @@ Your behaviour:
 - Keep your questions and feedback concise and specific to the company and role given."""
 
 
-def call_gemini(messages: list, retries: int = 4) -> str:
-    payload = {
-        "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
-        "contents": messages,
-    }
-    for attempt in range(1, retries + 1):
-        response = httpx.post(API_URL, json=payload, timeout=30)
-        if response.status_code == 429:
-            wait = attempt * 15          # 15s → 30s → 45s → 60s
-            print(f"\n  [Rate limited — waiting {wait}s before retry {attempt}/{retries}...]")
-            time.sleep(wait)
-            continue
-        response.raise_for_status()
-        return response.json()["candidates"][0]["content"]["parts"][0]["text"]
-    raise RuntimeError("API still rate-limiting after all retries. Wait a minute and try again.")
-
-
 def get_ideal_answer(company: str, role: str, question: str) -> str:
-    """Generate a model answer for the question — shown only if candidate requests it."""
-    prompt = (f"A candidate for {role} at {company} was asked: \"{question}\"\n\n"
+    prompt = (f"A candidate for {role} at {company} was asked:\n\"{question}\"\n\n"
               f"Give a strong, concise model answer (8-10 lines) that would impress an interviewer. "
               f"Format it clearly with key points.")
-    messages = [{"role": "user", "parts": [{"text": prompt}]}]
-    return call_gemini(messages)
+    return call_text([user_msg(prompt)])
 
 
 def get_performance_summary(company: str, role: str, qa_pairs: list) -> dict:
@@ -68,25 +41,18 @@ Return ONLY a JSON object with this exact structure:
   "recommendation": "Ready / Needs more prep / Not ready"
 }}"""
 
-    messages = [{"role": "user", "parts": [{"text": prompt}]}]
-    raw = call_gemini(messages)
+    raw     = call_text([user_msg(prompt)])
     cleaned = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
     return json.loads(cleaned)
 
 
-def save_session(company: str, role: str, qa_pairs: list, summary: dict):
+def save_session(company: str, role: str, qa_pairs: list, summary: dict) -> str:
     os.makedirs("data/sessions", exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = f"data/sessions/interview_{company.lower()}_{timestamp}.json"
-    data = {
-        "timestamp": timestamp,
-        "company": company,
-        "role": role,
-        "qa_pairs": qa_pairs,
-        "summary": summary,
-    }
+    filepath  = f"data/sessions/interview_{company.lower()}_{timestamp}.json"
     with open(filepath, "w") as f:
-        json.dump(data, f, indent=2)
+        json.dump({"timestamp": timestamp, "company": company,
+                   "role": role, "qa_pairs": qa_pairs, "summary": summary}, f, indent=2)
     return filepath
 
 
@@ -100,10 +66,10 @@ def main():
 ║              Terminal Interview Coach  🎯                    ║
 ║         Powered by Gemini 2.5 Flash + raw httpx              ║
 ╚══════════════════════════════════════════════════════════════╝
-  After each answer you can type:
-    's' → skip (move to next question)
-    'a' → see the ideal answer for that question
-    anything else → your actual answer
+  After each answer:
+    'a' → see the ideal answer first, then give your own
+    's' → skip this question
+    anything else → treated as your answer
 """)
 
     company = input("  Company you're preparing for: ").strip()
@@ -112,43 +78,39 @@ def main():
     divider()
 
     messages = []
-    opening = (f"Start the mock interview for {role} at {company}. "
-               f"Greet the candidate warmly, then ask your first question.")
-    messages.append({"role": "user", "parts": [{"text": opening}]})
+    opening  = (f"Start the mock interview for {role} at {company}. "
+                f"Greet the candidate warmly, then ask your first question.")
+    messages.append(user_msg(opening))
 
-    reply = call_gemini(messages)
-    messages.append({"role": "model", "parts": [{"text": reply}]})
+    reply = call_text(messages, system=SYSTEM)
+    messages.append(model_msg(reply))
     print(f"\nInterviewer: {reply}\n")
 
-    # Extract the first question from the opening reply
     current_question = reply
-
-    qa_pairs = []
-    total_questions = 5
+    qa_pairs         = []
+    total_questions  = 5
 
     for q_num in range(1, total_questions + 1):
         divider("·")
-        print(f"  Question {q_num} of {total_questions}  [ type 'a' for ideal answer | 's' to skip ]")
+        print(f"  Question {q_num} of {total_questions}  [ 'a' = ideal answer | 's' = skip ]")
         divider("·")
 
         answer = input("\nYou: ").strip()
 
-        # ── SHOW IDEAL ANSWER ──────────────────────────────────────
+        # Show ideal answer if requested
         if answer.lower() == "a":
             print("\n  Fetching ideal answer...\n")
             ideal = get_ideal_answer(company, role, current_question)
             divider("·")
-            print(f"  IDEAL ANSWER:\n")
-            print(f"  {ideal.replace(chr(10), chr(10) + '  ')}")
+            print("  IDEAL ANSWER:\n")
+            print("  " + ideal.replace("\n", "\n  "))
             divider("·")
             print("\n  Now give your own answer (or 's' to skip):\n")
             answer = input("You: ").strip()
 
-        # ── SKIP ───────────────────────────────────────────────────
         if answer.lower() == "s" or not answer:
             answer = "(skipped)"
 
-        # ── GET FEEDBACK + NEXT QUESTION ──────────────────────────
         if q_num < total_questions:
             prompt = (f"The candidate answered: \"{answer}\"\n"
                       f"Give brief feedback on that answer, then ask question {q_num + 1} of {total_questions}.")
@@ -156,22 +118,16 @@ def main():
             prompt = (f"The candidate answered: \"{answer}\"\n"
                       f"Give brief feedback on that final answer, then wrap up the interview professionally.")
 
-        messages.append({"role": "user", "parts": [{"text": prompt}]})
-        reply = call_gemini(messages)
-        messages.append({"role": "model", "parts": [{"text": reply}]})
+        messages.append(user_msg(prompt))
+        reply = call_text(messages, system=SYSTEM)
+        messages.append(model_msg(reply))
 
         print(f"\nInterviewer: {reply}\n")
 
-        # Track the next question (last thing the interviewer said)
         current_question = reply
+        qa_pairs.append({"question": f"Question {q_num}", "answer": answer, "feedback": reply})
 
-        qa_pairs.append({
-            "question": f"Question {q_num}",
-            "answer": answer,
-            "feedback": reply,
-        })
-
-    # ── PERFORMANCE SUMMARY ────────────────────────────────────────
+    # Performance summary
     divider()
     print("\n  Generating your performance report...\n")
     try:

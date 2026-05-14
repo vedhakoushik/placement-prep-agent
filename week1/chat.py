@@ -1,27 +1,6 @@
-import httpx
-import json
-import os
-from dotenv import load_dotenv
+from gemini_client import call, call_text, user_msg
 
-load_dotenv()
-
-API_KEY = os.getenv("GEMINI_API_KEY")
-MODEL = "gemini-2.5-flash"
-API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent?key={API_KEY}"
-
-SYSTEM_PROMPT = "You are a placement advisor helping engineering students prepare for tech company interviews in India."
-
-
-def call_gemini(user_message: str) -> dict:
-    payload = {
-        "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
-        "contents": [
-            {"role": "user", "parts": [{"text": user_message}]}
-        ],
-    }
-    response = httpx.post(API_URL, json=payload, timeout=30)
-    response.raise_for_status()
-    return response.json()
+SYSTEM = "You are a placement advisor helping engineering students prepare for tech company interviews in India."
 
 
 def main():
@@ -34,18 +13,15 @@ def main():
         if not user_input:
             continue
 
-        data = call_gemini(user_input)
+        data = call([user_msg(user_input)], system=SYSTEM)
 
-        # Gemini field mapping (vs Anthropic):
-        #   candidates[0].content.parts[0].text  →  content[0].text
-        #   candidates[0].finishReason            →  stop_reason
-        #   usageMetadata.promptTokenCount        →  usage.input_tokens
-        #   usageMetadata.candidatesTokenCount    →  usage.output_tokens
+        # Full response structure — uncomment to inspect:
+        # import json; print(json.dumps(data, indent=2))
 
-        reply = data["candidates"][0]["content"]["parts"][0]["text"]
+        reply        = data["candidates"][0]["content"]["parts"][0]["text"]
         input_tokens = data["usageMetadata"]["promptTokenCount"]
         output_tokens = data["usageMetadata"]["candidatesTokenCount"]
-        stop_reason = data["candidates"][0]["finishReason"]
+        stop_reason  = data["candidates"][0]["finishReason"]
 
         print(f"\nGemini: {reply}")
         print(f"\n[tokens: {input_tokens} in / {output_tokens} out | stop: {stop_reason}]\n")

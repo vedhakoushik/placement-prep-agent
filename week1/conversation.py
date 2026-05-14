@@ -1,26 +1,9 @@
-import httpx
 import json
 import os
 from datetime import datetime
-from dotenv import load_dotenv
+from gemini_client import call, user_msg, model_msg
 
-load_dotenv()
-
-API_KEY = os.getenv("GEMINI_API_KEY")
-MODEL = "gemini-2.5-flash"
-API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent?key={API_KEY}"
-
-SYSTEM_PROMPT = "You are a placement advisor helping engineering students prepare for tech company interviews in India."
-
-
-def call_gemini(messages: list) -> dict:
-    payload = {
-        "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
-        "contents": messages,   # full history sent every time — same concept as Anthropic
-    }
-    response = httpx.post(API_URL, json=payload, timeout=30)
-    response.raise_for_status()
-    return response.json()
+SYSTEM = "You are a placement advisor helping engineering students prepare for tech company interviews in India."
 
 
 def save_session(messages: list):
@@ -29,16 +12,14 @@ def save_session(messages: list):
     filepath = f"data/sessions/session_{timestamp}.json"
     with open(filepath, "w") as f:
         json.dump({"session": timestamp, "messages": messages}, f, indent=2)
-    print(f"\n[Session saved to {filepath}]")
+    print(f"\n[Session saved → {filepath}]")
 
 
 def main():
     print("Multi-turn conversation with Gemini (type 'quit' to exit)\n")
-    print(f"System: {SYSTEM_PROMPT}\n")
+    print(f"System: {SYSTEM}\n")
 
-    # Gemini uses "model" for assistant role; Anthropic uses "assistant"
-    # Everything else (appending history, sending full list) is identical
-    messages = []
+    messages = []   # grows every turn — this list IS the memory
 
     while True:
         user_input = input("You: ").strip()
@@ -48,15 +29,14 @@ def main():
         if not user_input:
             continue
 
-        messages.append({"role": "user", "parts": [{"text": user_input}]})
+        messages.append(user_msg(user_input))
+        data = call(messages, system=SYSTEM)
 
-        data = call_gemini(messages)
-
-        reply = data["candidates"][0]["content"]["parts"][0]["text"]
-        input_tokens = data["usageMetadata"]["promptTokenCount"]
+        reply         = data["candidates"][0]["content"]["parts"][0]["text"]
+        input_tokens  = data["usageMetadata"]["promptTokenCount"]
         output_tokens = data["usageMetadata"]["candidatesTokenCount"]
 
-        messages.append({"role": "model", "parts": [{"text": reply}]})
+        messages.append(model_msg(reply))
 
         print(f"\nGemini: {reply}")
         print(f"\n[tokens: {input_tokens} in / {output_tokens} out | turns: {len(messages) // 2}]\n")
