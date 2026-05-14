@@ -1,4 +1,4 @@
-from gemini_client import call, user_msg, model_msg
+from gemini_client import call, user_msg, model_msg, token_stats
 
 SYSTEM = "You are a placement advisor helping engineering students prepare for tech company interviews in India."
 
@@ -57,11 +57,10 @@ def main():
             continue
 
         messages.append(user_msg(user_input))
-        data = call(messages, system=SYSTEM)
+        data = call(messages, system=SYSTEM, use_cache=False)
 
-        reply         = data["candidates"][0]["content"]["parts"][0]["text"]
-        input_tok     = data["usageMetadata"]["promptTokenCount"]
-        output_tok    = data["usageMetadata"]["candidatesTokenCount"]
+        reply                  = data["candidates"][0]["content"]["parts"][0]["text"]
+        input_tok, output_tok  = token_stats(data)
 
         messages.append(model_msg(reply))
 
