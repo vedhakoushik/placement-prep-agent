@@ -1,6 +1,7 @@
 import httpx
 import json
 import os
+import time
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -20,14 +21,21 @@ Your behaviour:
 - Keep your questions and feedback concise and specific to the company and role given."""
 
 
-def call_gemini(messages: list) -> str:
+def call_gemini(messages: list, retries: int = 4) -> str:
     payload = {
         "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
         "contents": messages,
     }
-    response = httpx.post(API_URL, json=payload, timeout=30)
-    response.raise_for_status()
-    return response.json()["candidates"][0]["content"]["parts"][0]["text"]
+    for attempt in range(1, retries + 1):
+        response = httpx.post(API_URL, json=payload, timeout=30)
+        if response.status_code == 429:
+            wait = attempt * 15          # 15s → 30s → 45s → 60s
+            print(f"\n  [Rate limited — waiting {wait}s before retry {attempt}/{retries}...]")
+            time.sleep(wait)
+            continue
+        response.raise_for_status()
+        return response.json()["candidates"][0]["content"]["parts"][0]["text"]
+    raise RuntimeError("API still rate-limiting after all retries. Wait a minute and try again.")
 
 
 def get_ideal_answer(company: str, role: str, question: str) -> str:
