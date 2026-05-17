@@ -184,7 +184,6 @@ if __name__ == "__main__":
     print("  search_salary_info        — CTC and compensation")
     print("  search_preparation_tips   — topics to study")
     print("  search_company_culture    — work culture and reviews")
-    input("\nPress Enter to run Phase 2...")
 
     phase2_single_question(company, role)
     print("\nMoving to Phase 3 in 5 seconds...")

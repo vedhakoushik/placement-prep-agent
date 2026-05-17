@@ -26,7 +26,7 @@ def divider(title=""):
 
 # ── model ──────────────────────────────────────────────────────
 llm = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash",
+    model="gemini-2.5-flash",
     google_api_key=os.getenv("GEMINI_API_KEY"),
     temperature=0.3,
     max_output_tokens=800,
@@ -261,9 +261,5 @@ if __name__ == "__main__":
         exit(1)
 
     phase1_explain()
-    input("\nPress Enter for Phase 2 (file demo — no API calls)...")
-
     phase2_file_demo()
-    input("\nPress Enter for Phase 3 (live persistent agent)...")
-
     phase3_persistent_agent()

@@ -14,7 +14,7 @@ from langchain_tavily import TavilySearch
 load_dotenv()
 
 llm = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash",
+    model="gemini-2.5-flash",
     google_api_key=os.getenv("GEMINI_API_KEY"),
     temperature=0.3,
     max_output_tokens=600,
@@ -168,8 +168,6 @@ if __name__ == "__main__":
     role    = input("Role   : ").strip() or "SDE-1"
 
     phase1_explain()
-    input("\nPress Enter for Phase 2 (parallel search)...")
-
     phase2_parallel_chain(company)
     print("\nMoving to Phase 3 in 5 seconds...")
     time.sleep(5)
