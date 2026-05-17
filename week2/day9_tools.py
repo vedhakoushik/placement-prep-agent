@@ -1,239 +1,295 @@
 """
 Day 9 - LangChain Tools + Tavily Web Search
 ============================================
-Day 8: prompt | model | parser  -> static knowledge inside the model
-Day 9: model + tools            -> model can REACH OUT and fetch live data
+Core idea: Tools give the LLM the ability to ACT, not just recall.
+           Instead of knowing things, it reaches out and FINDS them.
 
-Three things you'll learn:
-  1. What a Tool is and how to make one with @tool
-  2. How to bind tools to an LLM so it can decide when to use them
-  3. Using Tavily (real-time web search) as a tool for company research
+This script works for ANY company, ANY role, ANY question.
+No hardcoded data. Everything is live.
+
+Three phases:
+  1. What a Tool is  - build a real dynamic tool with @tool
+  2. Tool + LLM      - let the LLM decide what to search and when
+  3. Full agent loop - user asks anything, agent researches and answers
 """
 
-import os, time, json
+import os, time
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.tools import tool
-from langchain_core.messages import HumanMessage, ToolMessage
+from langchain_core.messages import HumanMessage, ToolMessage, SystemMessage
 from langchain_tavily import TavilySearch
 
 load_dotenv()
 
-# ── Model setup ───────────────────────────────────────────────────────────────
+# ── helpers ───────────────────────────────────────────────────────────────────
+def extract_text(content) -> str:
+    """Gemini sometimes returns content as a list of blocks. Pull out the text."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return " ".join(b.get("text", "") for b in content if isinstance(b, dict))
+    return str(content)
+
+
+def divider(title=""):
+    line = "=" * 60
+    print(f"\n{line}")
+    if title:
+        print(title)
+        print(line)
+
+
+# ── Model ─────────────────────────────────────────────────────────────────────
 llm = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash",          # 1500 req/day free vs 20/day for 2.5-flash
+    model="gemini-2.0-flash",
     google_api_key=os.getenv("GEMINI_API_KEY"),
-    temperature=0.2,
-    max_output_tokens=600,
+    temperature=0.3,
+    max_output_tokens=800,
+)
+
+# ── Tavily client (shared across tools) ───────────────────────────────────────
+_tavily = TavilySearch(
+    tavily_api_key=os.getenv("TAVILY_API_KEY"),
+    max_results=4,
 )
 
 
-# ============================================================================
-# PART 1 — Custom Tool with @tool decorator
-# A tool is just a Python function the LLM can choose to call.
-# The docstring IS the tool's description — write it clearly!
-# ============================================================================
+# =============================================================================
+# PHASE 1 - What is a Tool?
+# A Tool is a Python function the LLM can call whenever it needs to.
+# The @tool decorator registers it and uses the docstring as the description.
+# The LLM reads the description to decide WHEN and HOW to call it.
+# =============================================================================
 
 @tool
-def get_interview_rounds(company: str) -> str:
-    """Returns the number of interview rounds and their names for a given Indian tech company."""
-    data = {
-        "wipro":   "3 rounds: Online Test → Technical Interview → HR",
-        "tcs":     "3 rounds: TCS NQT (Online Test) → Technical → HR",
-        "infosys": "3 rounds: InfyTQ Test → Technical Interview → HR",
-        "accenture":"3 rounds: Cognitive Test → Technical → HR",
-        "cognizant":"3 rounds: GAME (Online Test) → Technical → HR",
-        "hcl":     "2 rounds: Technical Interview → HR",
-    }
-    return data.get(company.lower(), f"No data available for {company}. Try a major IT company.")
+def search_interview_process(company: str) -> str:
+    """
+    Search the web for the current interview process at a company.
+    Returns real information about rounds, tests, and selection stages.
+    Use this when the user asks about how to get into a company.
+    """
+    query = f"{company} interview process selection rounds fresher 2024"
+    results = _tavily.invoke({"query": query})
+    if isinstance(results, list):
+        return "\n\n".join(r.get("content", "") for r in results[:3])
+    return str(results)
 
 
 @tool
-def get_salary_range(company: str, role: str) -> str:
-    """Returns the approximate fresher salary range (CTC in LPA) for a role at an Indian tech company."""
-    salary_map = {
-        ("wipro",     "sde"):      "3.5 – 6.5 LPA",
-        ("tcs",       "sde"):      "3.36 – 7 LPA",
-        ("infosys",   "sde"):      "3.6 – 8 LPA",
-        ("accenture", "analyst"):  "4.5 – 8 LPA",
-        ("google",    "sde"):      "20 – 45 LPA",
-        ("microsoft", "sde"):      "20 – 40 LPA",
-    }
-    key = (company.lower(), role.lower())
-    return salary_map.get(key, f"Salary data not available for {role} at {company}.")
+def search_salary_info(company: str, role: str) -> str:
+    """
+    Search the web for fresher salary and CTC information at a company for a specific role.
+    Returns real, up-to-date salary ranges in LPA (Lakhs Per Annum).
+    Use this when the user asks about pay, CTC, or compensation.
+    """
+    query = f"{company} {role} fresher salary CTC LPA package 2024 India"
+    results = _tavily.invoke({"query": query})
+    if isinstance(results, list):
+        return "\n\n".join(r.get("content", "") for r in results[:3])
+    return str(results)
 
 
-def demo_custom_tools():
-    print("\n" + "="*60)
-    print("PART 1 — Custom Tools (no internet, local lookup)")
-    print("="*60)
+@tool
+def search_preparation_tips(company: str, role: str) -> str:
+    """
+    Search the web for preparation tips, topics to study, and interview experiences
+    for a specific company and role. Returns real advice from candidates who got placed.
+    Use this when the user asks how to prepare or what to study.
+    """
+    query = f"{company} {role} interview preparation tips topics syllabus experience 2024"
+    results = _tavily.invoke({"query": query})
+    if isinstance(results, list):
+        return "\n\n".join(r.get("content", "") for r in results[:3])
+    return str(results)
 
-    # Bind tools to the LLM — now it KNOWS these tools exist
-    llm_with_tools = llm.bind_tools([get_interview_rounds, get_salary_range])
 
-    question = "How many rounds does Wipro have, and what is the SDE salary?"
+@tool
+def search_company_culture(company: str) -> str:
+    """
+    Search for information about work culture, work-life balance, growth opportunities,
+    and employee reviews at a company. Use this when the user asks about life at the company.
+    """
+    query = f"{company} work culture employee review work life balance growth 2024"
+    results = _tavily.invoke({"query": query})
+    if isinstance(results, list):
+        return "\n\n".join(r.get("content", "") for r in results[:3])
+    return str(results)
+
+
+ALL_TOOLS = [
+    search_interview_process,
+    search_salary_info,
+    search_preparation_tips,
+    search_company_culture,
+]
+
+TOOLS_MAP = {t.name: t for t in ALL_TOOLS}
+
+
+# =============================================================================
+# PHASE 2 - LLM + Tools: one question, LLM picks its own tools
+# =============================================================================
+
+def phase2_single_question(company: str, role: str):
+    divider("PHASE 2 - LLM picks which tools to call (you ask, it decides)")
+
+    llm_with_tools = llm.bind_tools(ALL_TOOLS)
+
+    system = SystemMessage(content=(
+        "You are a placement research assistant for Indian engineering students. "
+        "Use the available tools to find real, current information. "
+        "Always search before answering - never rely on assumptions."
+    ))
+
+    question = f"I am applying for {role} at {company}. What is the interview process and how should I prepare?"
     print(f"\nQuestion: {question}")
+    print("\n[LLM is deciding which tools to call...]\n")
 
-    messages = [HumanMessage(content=question)]
+    messages = [system, HumanMessage(content=question)]
     response = llm_with_tools.invoke(messages)
 
-    # Check if the LLM decided to call a tool
-    if response.tool_calls:
-        print(f"\n→ LLM chose to call {len(response.tool_calls)} tool(s):")
+    # Agent loop: keep calling tools until the LLM stops asking for them
+    rounds = 0
+    while response.tool_calls and rounds < 5:
+        rounds += 1
         messages.append(response)
+        print(f"Round {rounds} - LLM called {len(response.tool_calls)} tool(s):")
 
         for call in response.tool_calls:
-            print(f"  • Tool: {call['name']}  Args: {call['args']}")
-
-            # Actually run the tool
-            if call["name"] == "get_interview_rounds":
-                result = get_interview_rounds.invoke(call["args"])
-            else:
-                result = get_salary_range.invoke(call["args"])
-
+            print(f"  -> {call['name']}({call['args']})")
+            tool_fn  = TOOLS_MAP.get(call["name"])
+            result   = tool_fn.invoke(call["args"]) if tool_fn else "Tool not found."
             messages.append(ToolMessage(content=result, tool_call_id=call["id"]))
-            print(f"  • Result: {result}")
+            print(f"     [got {len(result)} chars of search results]")
 
-        # Feed tool results back -> get final answer
-        final   = llm_with_tools.invoke(messages)
-        content = final.content
-        # Gemini sometimes returns content as a list of blocks — extract text
-        if isinstance(content, list):
-            content = " ".join(b.get("text","") for b in content if isinstance(b, dict))
-        print(f"\n✓ Final Answer:\n{content}")
-    else:
-        content = response.content
-        if isinstance(content, list):
-            content = " ".join(b.get("text","") for b in content if isinstance(b, dict))
-        print(f"\n✓ Answer (no tool used):\n{content}")
+        time.sleep(3)
+        response = llm_with_tools.invoke(messages)
+
+    print(f"\nFinal Answer after {rounds} tool round(s):\n")
+    print(extract_text(response.content))
 
 
-# ============================================================================
-# PART 2 — Tavily Web Search Tool
-# Tavily is a search engine built for AI agents.
-# Unlike Google, it returns clean text (not HTML) that fits in a prompt.
-# ============================================================================
+# =============================================================================
+# PHASE 3 - Full dynamic agent: user drives the conversation
+# The agent keeps researching until the user is done.
+# No script, no fixed questions - completely open-ended.
+# =============================================================================
 
-def demo_tavily_search(company: str):
-    print("\n" + "="*60)
-    print("PART 2 — Tavily Web Search (live internet data)")
-    print("="*60)
+def run_agent(user_input: str, history: list) -> tuple[str, list]:
+    """Run one turn of the agent. Returns (answer, updated_history)."""
+    llm_with_tools = llm.bind_tools(ALL_TOOLS)
 
-    tavily_key = os.getenv("TAVILY_API_KEY")
-    if not tavily_key:
-        print("⚠  TAVILY_API_KEY not set in .env — skipping live search demo.")
-        print("   Get a free key at: https://app.tavily.com")
-        return
+    system = SystemMessage(content=(
+        "You are a placement research agent helping an engineering student in India. "
+        "For every question, use tools to find real, current information from the web. "
+        "Never make up numbers or facts — always search first. "
+        "Be concise, practical, and specific to the student's situation."
+    ))
 
-    # Tavily search tool — max_results=3 keeps token usage low
-    search = TavilySearch(
-        tavily_api_key=tavily_key,
-        max_results=3,
-    )
+    history.append(HumanMessage(content=user_input))
+    messages = [system] + history
 
-    query = f"{company} interview process fresher 2024 India"
-    print(f"\nSearching: '{query}'")
+    response = llm_with_tools.invoke(messages)
 
-    raw     = search.invoke({"query": query})
-    results = raw if isinstance(raw, list) else raw.get("results", [])
+    # Tool loop
+    rounds = 0
+    while response.tool_calls and rounds < 4:
+        rounds += 1
+        messages.append(response)
+        history.append(response)
 
-    print(f"\n-> Got {len(results)} results from the web:")
-    for i, r in enumerate(results, 1):
-        print(f"\n  [{i}] {r.get('url', 'N/A')}")
-        print(f"      {r.get('content','')[:200]}...")
+        for call in response.tool_calls:
+            print(f"  [searching: {call['name']}({call['args']})]")
+            tool_fn = TOOLS_MAP.get(call["name"])
+            result  = tool_fn.invoke(call["args"]) if tool_fn else "Tool not found."
+            tm = ToolMessage(content=result, tool_call_id=call["id"])
+            messages.append(tm)
+            history.append(tm)
 
-    # Now feed those results to the LLM to synthesise an answer
-    context = "\n\n".join(
-        f"Source {i+1}: {r['content']}" for i, r in enumerate(results)
-    )
-    prompt = f"""Based on the following web search results, summarise the interview process
-at {company} for a fresher software engineer. Be concise and practical.
+        time.sleep(3)
+        response = llm_with_tools.invoke(messages)
 
-Search results:
-{context}
-
-Summary:"""
-
-    print(f"\n→ Feeding results to LLM for synthesis...")
-    answer = llm.invoke(prompt)
-    print(f"\n✓ Synthesised Answer:\n{answer.content}")
+    answer = extract_text(response.content)
+    history.append(response)
+    return answer, history
 
 
-# ============================================================================
-# PART 3 — LLM decides WHICH tool to use (tool routing)
-# Give the LLM both tools. Ask a question. Watch it pick the right one.
-# ============================================================================
+def phase3_interactive_agent():
+    divider("PHASE 3 - Interactive Research Agent (type 'quit' to exit)")
+    print("Ask anything about any company, role, salary, prep, culture.")
+    print("The agent searches the web and answers in real time.\n")
 
-def demo_tool_routing():
-    print("\n" + "="*60)
-    print("PART 3 — Tool Routing (LLM decides which tool to call)")
-    print("="*60)
+    history = []
 
-    llm_with_tools = llm.bind_tools([get_interview_rounds, get_salary_range])
+    while True:
+        try:
+            user_input = input("You: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            break
 
-    questions = [
-        "What rounds does TCS have for campus placements?",
-        "What is the fresher salary for SDE at Google?",
-    ]
+        if not user_input or user_input.lower() in ("quit", "exit", "q"):
+            print("\nAgent session ended.")
+            break
 
-    tools_map = {
-        "get_interview_rounds": get_interview_rounds,
-        "get_salary_range":     get_salary_range,
-    }
-
-    for question in questions:
-        print(f"\nQ: {question}")
-        response = llm_with_tools.invoke([HumanMessage(content=question)])
-
-        if response.tool_calls:
-            call = response.tool_calls[0]
-            print(f"→ Tool selected: {call['name']}")
-            result = tools_map[call["name"]].invoke(call["args"])
-            print(f"→ Tool result:   {result}")
-
-            # Final answer
-            messages = [
-                HumanMessage(content=question),
-                response,
-                ToolMessage(content=result, tool_call_id=call["id"]),
-            ]
-            final   = llm_with_tools.invoke(messages)
-            content = final.content
-            if isinstance(content, list):
-                content = " ".join(b.get("text","") for b in content if isinstance(b, dict))
-            print(f"✓ Answer: {content}")
-        else:
-            c = response.content
-            if isinstance(c, list):
-                c = " ".join(b.get("text","") for b in c if isinstance(b, dict))
-            print(f"✓ Answer (no tool): {c}")
-
-        time.sleep(5)
+        print("\n[Agent is researching...]\n")
+        try:
+            answer, history = run_agent(user_input, history)
+            print(f"Agent: {answer}\n")
+        except Exception as e:
+            print(f"[Error: {e}]\n")
+            time.sleep(10)
 
 
-# ── MAIN ──────────────────────────────────────────────────────────────────────
+# =============================================================================
+# MAIN
+# =============================================================================
+
 if __name__ == "__main__":
     print("Day 9 - LangChain Tools + Tavily Web Search")
-    print("Tools let the LLM reach OUTSIDE its training data\n")
+    print("Dynamic agent: works for any company, any role, any question.\n")
 
-    company = input("Enter a company name for the Tavily search demo: ").strip() or "Wipro"
+    if not os.getenv("TAVILY_API_KEY"):
+        print("ERROR: TAVILY_API_KEY not set in .env")
+        print("Get a free key at https://app.tavily.com and add it to .env")
+        exit(1)
 
-    # Part 1: Custom tools
-    demo_custom_tools()
+    company = input("Company you are targeting: ").strip()
+    role    = input("Role you are applying for : ").strip()
 
-    time.sleep(6)
+    if not company or not role:
+        print("Please enter both company and role.")
+        exit(1)
 
-    # Part 2: Live web search (needs TAVILY_API_KEY)
-    demo_tavily_search(company)
+    # Phase 1: explain tools (no API call needed)
+    divider("PHASE 1 - What is a Tool?")
+    print("""
+A Tool is a Python function the LLM can CALL during its reasoning.
+You define it with @tool. The docstring tells the LLM when to use it.
 
-    time.sleep(6)
+Tools registered for this agent:
+  - search_interview_process  -> searches interview rounds and selection stages
+  - search_salary_info        -> searches CTC and compensation data
+  - search_preparation_tips   -> searches what to study and how to prepare
+  - search_company_culture    -> searches work culture and employee reviews
 
-    # Part 3: LLM picks the right tool on its own
-    demo_tool_routing()
+The LLM sees these descriptions and decides on its own which to call.
+No if-else routing. No hardcoded lookup tables.
+""")
 
-    print("\n" + "="*60)
-    print("Day 9 complete!")
-    print("Day 8: prompt | model | parser  (static - no live data)")
-    print("Day 9: model + tools            (dynamic, live data)")
-    print("Day 10: chains + tools + memory (full research agent)")
-    print("="*60)
+    input("Press Enter to run Phase 2...")
+
+    # Phase 2: one question, LLM picks tools
+    phase2_single_question(company, role)
+
+    print("\n\nPhase 2 done. Moving to Phase 3 in 5 seconds...")
+    time.sleep(5)
+
+    # Phase 3: fully interactive agent
+    phase3_interactive_agent()
+
+    divider("Day 9 Complete")
+    print("Day 8: prompt | model | parser    (static, one-shot)")
+    print("Day 9: model + tools + agent loop (dynamic, live web search)")
+    print("Day 10: add memory so the agent remembers across sessions")
+    print("=" * 60)
