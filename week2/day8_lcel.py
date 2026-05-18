@@ -1,85 +1,85 @@
-"""
-Day 8 — LangChain LCEL
-Three primitives: ChatModel | PromptTemplate | OutputParser
-The pipe operator chains them: prompt | model | parser
-"""
+"""Day 8 — LangChain Setup & LCEL
+# pip install langchain langchain-anthropic langchain-community langchain-core
+
+Three primitives: ChatAnthropic | ChatPromptTemplate | JsonOutputParser
+Connected with | pipe operator — same as function composition, nothing magical.
+Task: recreate Day 4's company JSON extractor using LCEL instead of raw httpx."""
+
 import os
 from dotenv import load_dotenv
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_anthropic import ChatAnthropic
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
-from pydantic import BaseModel, Field
 
 load_dotenv()
 
+def divider(title=""):
+    print(f"\n{'='*60}")
+    if title: print(f"{title}\n{'='*60}")
 
-# ── 1. THE MODEL ──────────────────────────────────────────────────────────────
-# Same as call_gemini() in Week 1, but wrapped as a LangChain object
-llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
-    google_api_key=os.getenv("GEMINI_API_KEY"),
-    temperature=0.3,
-    max_output_tokens=512,
+# ── primitive 1: model ─────────────────────────────────────────
+# same as your Week 1 httpx call — just wrapped as a LangChain Runnable
+llm = ChatAnthropic(
+    model="claude-sonnet-4-5",
+    anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
+    temperature=0.2,
+    max_tokens=800,
 )
 
+# ── primitive 2: prompt template ───────────────────────────────
+# replaces f-strings — {variable} slots filled at invoke time
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "You are a placement advisor for Indian engineering students. "
+               "Always return valid JSON when asked."),
+    ("human",  "Return a JSON object for {company} with keys: "
+               "company_name, hq, founded, tech_stack (list), known_for."),
+])
 
-# ── 2. PLAIN TEXT CHAIN ───────────────────────────────────────────────────────
-# prompt | model | parser  — the pipe IS function composition
-def plain_chain(company: str) -> str:
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are a placement advisor for Indian engineering students."),
-        ("human", "In 5 bullet points, what should a fresher prepare for {company} interviews?"),
-    ])
-    chain = prompt | llm | StrOutputParser()
-    return chain.invoke({"company": company})
-
-
-# ── 3. JSON CHAIN (recreates Day 4's company profile) ─────────────────────────
-# Pydantic model defines the exact JSON structure we want back
-class CompanyProfile(BaseModel):
-    company:              str       = Field(description="Company name")
-    founded:              str       = Field(description="Year founded")
-    hq:                   str       = Field(description="Headquarters city")
-    tech_stack:           list[str] = Field(description="Main technologies used")
-    known_for:            str       = Field(description="What the company is known for")
-    typical_roles:        list[str] = Field(description="Common fresher roles")
-    interview_difficulty: str       = Field(description="easy, medium, or hard")
+# ── primitive 3: output parser ─────────────────────────────────
+# strips markdown fences and calls json.loads() — no manual parsing needed
+json_parser = JsonOutputParser()
+str_parser  = StrOutputParser()     # use when you just want plain text
 
 
-def json_chain(company: str) -> dict:
-    parser = JsonOutputParser(pydantic_object=CompanyProfile)
-
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are a JSON API. Return only valid JSON, no explanation."),
-        ("human", "Return a company profile for {company}.\n\n{format_instructions}"),
-    ]).partial(format_instructions=parser.get_format_instructions())
-
-    chain = prompt | llm | parser
-    return chain.invoke({"company": company})
+# ── the chain — pipe operator wires primitives together ────────
+# data flows left → right: prompt fills vars → llm generates → parser cleans
+json_chain = prompt | llm | json_parser
+str_chain  = prompt | llm | str_parser   # same prompt, plain text output
 
 
-# ── MAIN ──────────────────────────────────────────────────────────────────────
+# ── comparison: raw Week 1 vs LCEL ────────────────────────────
+def show_comparison():
+    divider("Week 1 Raw  vs  Week 2 LCEL")
+    print("""
+  Week 1 Day 4 (raw httpx):              Week 2 Day 8 (LCEL):
+  ───────────────────────────────────    ──────────────────────────────────
+  import httpx, json                     from langchain_anthropic import ...
+  url = "https://api.anthropic.com/..."
+  headers = {"x-api-key": ..., ...}      llm    = ChatAnthropic(...)
+  body    = {"model":..., ...}           prompt = ChatPromptTemplate(...)
+  r = httpx.post(url, json=body)         parser = JsonOutputParser()
+  r.raise_for_status()
+  raw  = r.json()["content"][0]["text"]  chain  = prompt | llm | parser
+  data = json.loads(raw)
+  return data                            result = chain.invoke({"company": c})
+
+  ~35 lines of boilerplate               ~3 lines — identical result
+""")
+
+
+# ── task: company JSON extractor ───────────────────────────────
+def extract_company_info(company: str) -> dict:
+    divider(f"JSON extract — {company}")
+    result = json_chain.invoke({"company": company})    # returns a real Python dict
+    for k, v in result.items():
+        print(f"  {k}: {v}")
+    return result
+
+
+# ── main ───────────────────────────────────────────────────────
 if __name__ == "__main__":
-    import json, time
+    show_comparison()
 
-    company = input("Enter company name: ").strip()
-
-    print("\n" + "="*60)
-    print("PLAIN TEXT CHAIN  (prompt | model | StrOutputParser)")
-    print("="*60)
-    print(plain_chain(company))
-
-    time.sleep(8)   # avoid rate limit between calls
-
-    print("\n" + "="*60)
-    print("JSON CHAIN  (prompt | model | JsonOutputParser)")
-    print("="*60)
-    result = json_chain(company)
-    print(json.dumps(result, indent=2))
-
-    print("\n" + "="*60)
-    print("COMPARISON: Week 1 vs Week 2")
-    print("="*60)
-    print("Week 1: manual httpx call + json.loads() + retry loop = ~40 lines")
-    print("Week 2: prompt | model | parser                        = ~5 lines")
-    print("Same result. LangChain just removes the plumbing.")
+    company = input("Company to extract: ").strip() or "Infosys"
+    data = extract_company_info(company)
+    print(f"\nResult type: {type(data).__name__}")      # dict — ready to use in code
