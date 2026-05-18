@@ -1,14 +1,14 @@
 """Day 11 — Web Search with Tavily
-TavilySearchResults added as a tool. create_react_agent + AgentExecutor run the loop.
-verbose=True lets you watch Claude reason → pick tool → read result → reason again (ReAct).
+TavilySearchResults added as a tool. create_tool_calling_agent + AgentExecutor run the loop.
+verbose=True lets you watch Gemini pick a tool, read the result, and respond.
 Task: research Infosys SDE-1 interview process — log every tool call."""
 
 import os
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_community.tools.tavily_search import TavilySearchResults
-from langchain.agents import create_react_agent, AgentExecutor
-from langchain_core.prompts import PromptTemplate
+from langchain.agents import create_tool_calling_agent, AgentExecutor
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 load_dotenv()
 
@@ -23,8 +23,7 @@ llm = ChatGoogleGenerativeAI(
     max_output_tokens=1000,
 )
 
-# ── tool: tavily web search ─────────────────────────────────────
-# max_results=3 keeps context short; k= is the same param in some versions
+# ── tool: tavily web search ────────────────────────────────────
 tavily = TavilySearchResults(
     tavily_api_key=os.getenv("TAVILY_API_KEY"),
     max_results=3,
@@ -32,41 +31,27 @@ tavily = TavilySearchResults(
 tools = [tavily]
 
 
-# ── ReAct prompt ───────────────────────────────────────────────
-# create_react_agent requires these exact variables in the prompt:
-# {tools}  {tool_names}  {input}  {agent_scratchpad}
-REACT_TEMPLATE = """You are a placement research assistant for Indian engineering students.
-Answer questions using the tools available. Think step by step.
-
-Tools available:
-{tools}
-
-Use this format:
-Question: the question to answer
-Thought: what you need to do next
-Action: the tool to use — must be one of [{tool_names}]
-Action Input: the exact query to pass to the tool
-Observation: the tool result
-... (repeat Thought/Action/Action Input/Observation as needed)
-Thought: I now have enough information
-Final Answer: your complete answer
-
-Begin!
-
-Question: {input}
-Thought:{agent_scratchpad}"""
-
-react_prompt = PromptTemplate.from_template(REACT_TEMPLATE)
+# ── prompt ─────────────────────────────────────────────────────
+# create_tool_calling_agent requires MessagesPlaceholder("agent_scratchpad")
+# this is where the agent writes its tool calls and results internally
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "You are a placement research assistant for Indian engineering students. "
+               "Use the search tool to find real, current information before answering."),
+    ("human", "{input}"),
+    MessagesPlaceholder(variable_name="agent_scratchpad"),  # tool call history goes here
+])
 
 
 # ── agent setup ────────────────────────────────────────────────
-agent          = create_react_agent(llm, tools, react_prompt)
+# create_tool_calling_agent uses Gemini's native function calling (not text-based ReAct)
+agent = create_tool_calling_agent(llm, tools, prompt)
+
 agent_executor = AgentExecutor(
     agent=agent,
     tools=tools,
-    verbose=True,               # prints every Thought / Action / Observation
+    verbose=True,               # prints every tool call and result
     max_iterations=5,           # stop after 5 tool calls at most
-    handle_parsing_errors=True, # retry if Claude returns malformed action
+    handle_parsing_errors=True,
 )
 
 
@@ -80,11 +65,8 @@ def research(query: str) -> str:
 # ── main ───────────────────────────────────────────────────────
 if __name__ == "__main__":
     divider("Day 11 — Web Search with Tavily  (verbose=True)")
-    print("Watch the ReAct loop: Thought → Action → Observation → repeat\n")
+    print("Watch the agent: pick tool → search → read result → answer\n")
 
     # task from the plan
     answer = research("Research Infosys SDE-1 interview process — rounds, topics, difficulty, salary.")
     print(f"\n{'='*60}\nFinal Answer:\n{answer}")
-
-    # tip: paste the verbose output into Claude.ai and ask
-    # "explain what this agent is doing at each step"
