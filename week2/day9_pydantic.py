@@ -7,7 +7,7 @@ import os
 from typing import Literal
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
-from langchain_anthropic import ChatAnthropic
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain.output_parsers import PydanticOutputParser
 
@@ -17,11 +17,11 @@ def divider(title=""):
     print(f"\n{'='*60}")
     if title: print(f"{title}\n{'='*60}")
 
-llm = ChatAnthropic(
-    model="claude-sonnet-4-5",
-    anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
+llm = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash",
+    google_api_key=os.getenv("GEMINI_API_KEY"),
     temperature=0.1,
-    max_tokens=800,
+    max_output_tokens=800,
 )
 
 

@@ -6,7 +6,7 @@ Task: ask about Amazon, then ask 'what about their competitors?' — chain must 
 
 import os
 from dotenv import load_dotenv
-from langchain_anthropic import ChatAnthropic
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables.history import RunnableWithMessageHistory
@@ -20,11 +20,11 @@ def divider(title=""):
     print(f"\n{'='*60}")
     if title: print(f"{title}\n{'='*60}")
 
-llm = ChatAnthropic(
-    model="claude-sonnet-4-5",
-    anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
+llm = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash",
+    google_api_key=os.getenv("GEMINI_API_KEY"),
     temperature=0.3,
-    max_tokens=600,
+    max_output_tokens=600,
 )
 
 

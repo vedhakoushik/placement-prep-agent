@@ -6,7 +6,7 @@ Task: 'What is 2847 * 39, and what day of the week is it today?' — Claude uses
 import os
 from datetime import date
 from dotenv import load_dotenv
-from langchain_anthropic import ChatAnthropic
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.tools import tool
 from langchain_core.messages import HumanMessage, ToolMessage, AIMessage
 
@@ -16,11 +16,11 @@ def divider(title=""):
     print(f"\n{'='*60}")
     if title: print(f"{title}\n{'='*60}")
 
-llm = ChatAnthropic(
-    model="claude-sonnet-4-5",
-    anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
+llm = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash",
+    google_api_key=os.getenv("GEMINI_API_KEY"),
     temperature=0,              # 0 = deterministic for tool calls
-    max_tokens=500,
+    max_output_tokens=500,
 )
 
 

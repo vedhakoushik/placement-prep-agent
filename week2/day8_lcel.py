@@ -1,13 +1,13 @@
 """Day 8 — LangChain Setup & LCEL
-# pip install langchain langchain-anthropic langchain-community langchain-core
+# pip install langchain langchain-google-genai langchain-community langchain-core
 
-Three primitives: ChatAnthropic | ChatPromptTemplate | JsonOutputParser
+Three primitives: ChatGoogleGenerativeAI | ChatPromptTemplate | JsonOutputParser
 Connected with | pipe operator — same as function composition, nothing magical.
 Task: recreate Day 4's company JSON extractor using LCEL instead of raw httpx."""
 
 import os
 from dotenv import load_dotenv
-from langchain_anthropic import ChatAnthropic
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
 
@@ -19,11 +19,11 @@ def divider(title=""):
 
 # ── primitive 1: model ─────────────────────────────────────────
 # same as your Week 1 httpx call — just wrapped as a LangChain Runnable
-llm = ChatAnthropic(
-    model="claude-sonnet-4-5",
-    anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
+llm = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash",
+    google_api_key=os.getenv("GEMINI_API_KEY"),
     temperature=0.2,
-    max_tokens=800,
+    max_output_tokens=800,
 )
 
 # ── primitive 2: prompt template ───────────────────────────────
@@ -53,13 +53,13 @@ def show_comparison():
     print("""
   Week 1 Day 4 (raw httpx):              Week 2 Day 8 (LCEL):
   ───────────────────────────────────    ──────────────────────────────────
-  import httpx, json                     from langchain_anthropic import ...
-  url = "https://api.anthropic.com/..."
-  headers = {"x-api-key": ..., ...}      llm    = ChatAnthropic(...)
-  body    = {"model":..., ...}           prompt = ChatPromptTemplate(...)
+  import httpx, json                     from langchain_google_genai import ...
+  url = "https://generativelanguage..."
+  headers = {"x-goog-api-key": ...}      llm    = ChatGoogleGenerativeAI(...)
+  body    = {"contents": [...]}          prompt = ChatPromptTemplate(...)
   r = httpx.post(url, json=body)         parser = JsonOutputParser()
   r.raise_for_status()
-  raw  = r.json()["content"][0]["text"]  chain  = prompt | llm | parser
+  raw  = r.json()["candidates"][0]...    chain  = prompt | llm | parser
   data = json.loads(raw)
   return data                            result = chain.invoke({"company": c})
 
