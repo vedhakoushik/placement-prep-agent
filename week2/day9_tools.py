@@ -2,6 +2,7 @@
 @tool registers a function the LLM can call. Docstring = when to use it."""
 
 import os, time
+from datetime import date
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.tools import tool
@@ -32,7 +33,62 @@ llm = ChatGoogleGenerativeAI(
 _tavily = TavilySearch(tavily_api_key=os.getenv("TAVILY_API_KEY"), max_results=4)
 
 
-# ── tools ──────────────────────────────────────────────────────
+# ── phase 1 simple tools — show the @tool concept with no API calls ──
+# the LLM calls these just like any other tool; they just use plain Python
+
+@tool
+def get_today_date() -> str:
+    """Returns today's date. Use when the user asks what today's date is."""
+    return str(date.today())
+
+@tool
+def calculate(expression: str) -> str:
+    """Evaluates a basic math expression and returns the result.
+    Use when the user asks you to calculate or compute something.
+    Example expressions: '25 * 4', '100 / 3', '2 ** 10'"""
+    try:
+        result = eval(expression, {"__builtins__": {}})  # safe eval, no builtins
+        return str(result)
+    except Exception as e:
+        return f"Error: {e}"
+
+SIMPLE_TOOLS     = [get_today_date, calculate]
+SIMPLE_TOOLS_MAP = {t.name: t for t in SIMPLE_TOOLS}
+
+
+# ── phase 1: run simple tools so the LLM calls them live ───────
+def phase1_simple_tools():
+    divider("PHASE 1 — What is a Tool?  (date + calculator demo)")
+
+    llm_simple = llm.bind_tools(SIMPLE_TOOLS)   # only the two simple tools here
+
+    questions = [
+        "What is today's date?",
+        "What is 128 multiplied by 37?",
+        "What is today's date and also what is 2 raised to the power 10?",
+    ]
+
+    for q in questions:
+        print(f"Q: {q}")
+        messages = [HumanMessage(content=q)]
+        response = llm_simple.invoke(messages)
+
+        # tool loop — same pattern used in Phase 2 and 3
+        while response.tool_calls:
+            messages.append(response)
+            for call in response.tool_calls:
+                print(f"  → calling {call['name']}({call['args']})")
+                fn     = SIMPLE_TOOLS_MAP.get(call["name"])
+                result = fn.invoke(call["args"]) if fn else "Tool not found."
+                print(f"  ← result: {result}")
+                messages.append(ToolMessage(content=result, tool_call_id=call["id"]))
+            response = llm_simple.invoke(messages)
+
+        print(f"A: {extract_text(response.content)}\n")
+        time.sleep(2)
+
+
+# ── placement tools — four Tavily search tools ─────────────────
 # define what the LLM can search — docstring tells it WHEN to call each tool
 
 @tool
@@ -179,11 +235,13 @@ if __name__ == "__main__":
         print("Both fields required.")
         exit(1)
 
-    divider("PHASE 1 — Registered Tools")
+    phase1_simple_tools()                           # date + calculator demo, no Tavily
+
+    divider("PHASE 2 setup — Placement Tools registered")
     print("  search_interview_process  — rounds and stages")
     print("  search_salary_info        — CTC and compensation")
     print("  search_preparation_tips   — topics to study")
-    print("  search_company_culture    — work culture and reviews")
+    print("  search_company_culture    — work culture and reviews\n")
 
     phase2_single_question(company, role)
     print("\nMoving to Phase 3 in 5 seconds...")
