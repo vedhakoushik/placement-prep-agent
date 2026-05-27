@@ -19,6 +19,30 @@ data/sessions/
 *.json
 chroma_db/
 
+# ChromaDB vector stores (binary index files -- regenerate locally)
+week3/qa_db/
+week3/project_knowledge_db/
+week3/chroma_db_task/
+week3/chroma_flipkart/
+week3/stores/
+
+# SQLite checkpoint databases (regenerated on each run)
+*.db
+*.db-shm
+*.db-wal
+*.sqlite3
+
+# JavaScript / Node
+node_modules/
+package-lock.json
+
+# Generated one-off artefacts
+screenshots.html
+ss_chat.txt
+Week1_Progress_Report.docx
+create_report.js
+take_screenshots.js
+
 # IDE
 .vscode/
 .idea/

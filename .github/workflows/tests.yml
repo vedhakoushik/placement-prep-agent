@@ -1,0 +1,45 @@
+name: Tests
+
+# Run on every push to every branch, and on every pull request.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  unit-tests:
+    name: "Unit tests (Python ${{ matrix.python-version }})"
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: ["3.11"]   # add "3.12" here later if needed
+
+    steps:
+      # 1. Check out the code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Set up the right Python version
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"                  # caches pip downloads between runs
+
+      # 3. Install only what the tests need (fast -- no chromadb, streamlit, etc.)
+      - name: Install test dependencies
+        run: pip install -r requirements-test.txt
+
+      # 4. Run tests -- verbose output, short tracebacks, exit 1 on any failure
+      - name: Run pytest
+        run: python -m pytest week6/day37_unit_tests.py -v --tb=short
+
+      # 5. Print a quick summary line (always runs, even if tests fail)
+      - name: Test summary
+        if: always()
+        run: |
+          echo "Workflow triggered by: ${{ github.event_name }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Commit: ${{ github.sha }}"
