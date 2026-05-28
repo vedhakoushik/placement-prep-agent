@@ -44,10 +44,10 @@ COPY --from=builder /opt/venv /opt/venv
 COPY --chown=appuser:appuser . .
 
 # Make venv the active Python environment
+# Streamlit config via env vars (no config.toml needed at runtime)
 ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    # Streamlit config via env vars (no config.toml needed at runtime)
     STREAMLIT_SERVER_PORT=8501 \
     STREAMLIT_SERVER_ADDRESS=0.0.0.0 \
     STREAMLIT_SERVER_HEADLESS=true \
