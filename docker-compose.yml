@@ -1,0 +1,47 @@
+# ─────────────────────────────────────────────────────────────
+#  docker-compose.yml — Local Development  (Day 43)
+#
+#  Usage:
+#    docker compose up          # start app (builds if needed)
+#    docker compose up --build  # force rebuild
+#    docker compose down        # stop and remove containers
+#    docker compose logs -f     # tail logs
+# ─────────────────────────────────────────────────────────────
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime       # use the final runtime stage
+
+    image: placement-prep:local
+
+    container_name: placement-prep-app
+
+    ports:
+      - "8501:8501"          # host:container
+
+    # Load API keys from .env file (never hard-code secrets here)
+    env_file:
+      - .env
+
+    # Extra env overrides for local dev
+    environment:
+      - PYTHONUNBUFFERED=1
+      - STREAMLIT_SERVER_HEADLESS=true
+
+    # Mount source for live-reload during development
+    # Comment this out for a clean production-like run
+    volumes:
+      - .:/app
+      - /app/__pycache__     # exclude pycache from mount
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+    restart: unless-stopped
