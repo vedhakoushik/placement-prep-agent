@@ -31,61 +31,7 @@ You: "Prepare me for Google SDE-2, focus on DSA"
 
 ## Architecture
 
-The system is split into four layers that evolved across 8 weeks of development:
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│  CONVERSATION & TOOLS  (Weeks 1–2)                               │
-│                                                                  │
-│  day13_project.py ──evolves from──► conversation.py             │
-│  day8_lcel.py     ──uses──────────► day10_tools.py              │
-│                              both call ▼                         │
-│                         gemini_client.py  (LLM wrapper)          │
-└──────────────────────────────────────────────────────────────────┘
-         │ informs                    │ feeds
-         ▼                            ▼
-┌──────────────────┐   ┌──────────────────────────────────────────┐
-│  WEB APP          │   │  RETRIEVAL STORE  (Week 3)               │
-│  (prototype)      │   │                                          │
-│                  │   │  portal.py  ──serves──►  project_rag.py  │
-│  app.py          │   │                          │         │      │
-│  ├── index.html  │   │                      builds     queries  │
-│  └── app.js      │   │                          ▼         ▼      │
-│                  │   │              Ingest     ChromaDB           │
-│  (Flask/Jinja    │   │              pipeline   [db_manager.py]   │
-│   prototype,     │   │              chunking   Vector store      │
-│   superseded     │   │                                          │
-│   by Streamlit)  │   └──────────────────────────────────────────┘
-└──────────────────┘              │ persists knowledge + retrieves
-         │ delegates              ▼
-         └──────────────────────────────────────────────────┐
-                                                            ▼
-┌──────────────────────────────────────────────────────────────────┐
-│  AGENTS & ORCHESTRATION  (Weeks 4–5)                            │
-│                                                                  │
-│              day34_35_app.py  ◄──── MAIN APP                    │
-│                    │                                             │
-│         coordinates│              traces│                        │
-│                    ▼                    ▼                        │
-│          Supervisor multi-agent   day33_langsmith.py            │
-│                    │              (LangSmith tracing)            │
-│          orchestrates│                                           │
-│                    ▼                                             │
-│          State graphs (LangGraph)                                │
-│                    │                                             │
-│              drives│                                             │
-│                    ▼                                             │
-│              ReAct agent                                         │
-└──────────────────────────────────────────────────────────────────┘
-         │ validated by
-         ▼
-┌──────────────────────────────────────────────────────────────────┐
-│  QUALITY & OPS  (Weeks 6–7)                                     │
-│                                                                  │
-│  day36_audit.py  (audit & validation)                           │
-│       └── runs in ── tests.yml / ci.yml  (GitHub Actions)       │
-└──────────────────────────────────────────────────────────────────┘
-```
+![Architecture Diagram](diagram.png)
 
 ### LangGraph Pipeline (4-Node Core)
 
