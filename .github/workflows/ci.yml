@@ -84,9 +84,7 @@ jobs:
           cache: pip
 
       - name: Install dependencies
-        run: |
-          pip install -r requirements-test.txt
-          pip install langgraph
+        run: pip install -r requirements-test.txt
 
       - name: Run integration tests
         run: python -m pytest week6/day38_integration_tests.py -v --tb=short

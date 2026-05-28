@@ -1,11 +1,16 @@
-# Minimal dependencies for the test suite (week6/day37_unit_tests.py)
+# Minimal dependencies for the test suite (week6/day37 + day38)
 # All external API calls are mocked, so no real keys are needed.
 # Keep this file lean -- CI installs it on every push.
 
 pytest>=9.0
 pydantic>=2.0
 
+# LangGraph + SQLite checkpointer (SqliteSaver lives in a separate package
+# since LangGraph 0.2 -- both are required for day38_integration_tests.py)
+langgraph>=0.2
+langgraph-checkpoint-sqlite
+
 # These two must be *importable* even though they are mocked,
-# because patch("tavily.TavilyClient") needs the module to exist.
+# because the node functions import them at the top of day38.
 tavily-python>=0.5
 google-generativeai>=0.8
