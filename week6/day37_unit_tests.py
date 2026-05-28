@@ -413,9 +413,3 @@ if __name__ == "__main__":
         cwd=str(ROOT)
     )
     sys.exit(result.returncode)
-
-
-# ── DELIBERATE BREAKING TEST (CI demo) ──────────────────────────
-def test_BREAKING_this_will_fail():
-    """This test is intentionally broken to demonstrate CI failure."""
-    assert 1 == 2, "BREAKING CHANGE: this commit is intentionally broken for CI demo"
