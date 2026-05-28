@@ -23,6 +23,11 @@ build/
 .DS_Store
 Thumbs.db
 
+# ── Virtual environments (NEVER copy into image) ──────────────
+.venv/
+venv/
+env/
+
 # ── Large/unnecessary files ───────────────────────────────────
 node_modules/
 *.docx
