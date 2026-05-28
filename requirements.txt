@@ -1,20 +1,24 @@
-# Week 1
-httpx==0.27.0
-python-dotenv==1.0.1
+# ── Core ──────────────────────────────────────────────────────
+python-dotenv==1.0.0
+httpx==0.28.1
+pydantic==2.12.5
 
-# Week 2
-langchain==0.3.25
-langchain-google-genai==2.1.4
-langchain-community==0.3.24
-pydantic==2.11.4
-tavily-python==0.5.1
-langchain_tavily
+# ── LangChain / LangGraph ──────────────────────────────────────
+langchain-core==1.4.0
+langchain-google-genai==4.2.3
+langgraph==1.2.1
+langgraph-checkpoint-sqlite==3.1.0
+langsmith==0.8.5
 
-# Week 3
+# ── Google Gemini ──────────────────────────────────────────────
+google-generativeai==0.7.2
+google-genai==1.75.0
+
+# ── Search ────────────────────────────────────────────────────
+tavily-python==0.7.24
+
+# ── UI ────────────────────────────────────────────────────────
+streamlit==1.56.0
+
+# ── Vector store (Week 3) ──────────────────────────────────────
 chromadb
-
-# Week 5
-streamlit
-langsmith
-langgraph
-google-generativeai
