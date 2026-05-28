@@ -1,16 +1,14 @@
-# Minimal dependencies for the test suite (week6/day37 + day38)
-# All external API calls are mocked, so no real keys are needed.
-# Keep this file lean -- CI installs it on every push.
+# Test dependencies — pinned to exact versions that work locally.
+# No API keys needed — all external calls are mocked.
 
-pytest>=9.0
+pytest>=7.0
 pydantic>=2.0
 
-# LangGraph + SQLite checkpointer (SqliteSaver lives in a separate package
-# since LangGraph 0.2 -- both are required for day38_integration_tests.py)
-langgraph>=0.2
-langgraph-checkpoint-sqlite
+# LangGraph core + SQLite checkpointer
+# (SqliteSaver moved to a separate package in LangGraph 0.2+)
+langgraph==1.2.1
+langgraph-checkpoint-sqlite==3.1.0
 
-# These two must be *importable* even though they are mocked,
-# because the node functions import them at the top of day38.
-tavily-python>=0.5
-google-generativeai>=0.8
+# Required for node function imports in day38 (lazy imports, always mocked)
+tavily-python==0.7.24
+google-generativeai==0.7.2
