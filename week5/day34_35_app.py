@@ -5,6 +5,7 @@ Run:  streamlit run week5/day34_35_app.py
 """
 
 import os, re, json, time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, date
 from dotenv import load_dotenv
 load_dotenv()
@@ -380,19 +381,75 @@ def _gemini(prompt: str) -> str:
     model = genai.GenerativeModel(cfg.get("gemini_model", "gemini-2.5-flash"))
     return model.generate_content(prompt).text.strip()
 
-def _search(query: str) -> list:
+def _search(query: str, max_results: int = 5) -> list:
     from tavily import TavilyClient
     cfg = get_cfg()
     tavily = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
-    res = tavily.search(query=query, max_results=5,
+    res = tavily.search(query=query, max_results=max_results,
                         search_depth=cfg.get("search_depth", "basic"))
     return [r.get("content", "")[:500] for r in res.get("results", []) if r.get("content")]
 
+def _search_domains(query: str, domains: list, max_results: int = 4) -> list:
+    """Tavily search restricted to specific domains (e.g. glassdoor.com)."""
+    from tavily import TavilyClient
+    cfg = get_cfg()
+    tavily = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
+    res = tavily.search(query=query, max_results=max_results,
+                        search_depth=cfg.get("search_depth", "basic"),
+                        include_domains=domains)
+    return [r.get("content", "")[:500] for r in res.get("results", []) if r.get("content")]
+
+def _research_all(company: str, role: str, focus: str) -> dict:
+    """
+    Run three searches in parallel using ThreadPoolExecutor.
+
+    Source 1 — General web (Tavily open search):
+        Interview experiences, DSA questions, tips, tech blogs.
+
+    Source 2 — Glassdoor (domain-filtered):
+        Company ratings, interview difficulty, culture reviews,
+        salary bands. Gives the 'insider' view no blog covers.
+
+    Source 3 — Job portals (Naukri / LinkedIn / Indeed):
+        Active JD requirements, must-have skills, CTC ranges.
+        Tells you exactly what the company is hiring for right now.
+
+    All three run simultaneously — total time ≈ slowest single search
+    instead of 3× sequential time.
+    """
+    def _safe(future):
+        try:
+            return future.result(timeout=25)
+        except Exception:
+            return []
+
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        f_general   = ex.submit(
+            _search,
+            f"{company} {role} interview experience questions {focus} 2024 2025",
+        )
+        f_glassdoor = ex.submit(
+            _search_domains,
+            f"{company} interview difficulty reviews culture rating work life balance",
+            ["glassdoor.com"],
+        )
+        f_jobs = ex.submit(
+            _search_domains,
+            f"{company} {role} job requirements skills responsibilities",
+            ["naukri.com", "linkedin.com", "indeed.com", "instahyre.com"],
+        )
+
+        return {
+            "general":   _safe(f_general),
+            "glassdoor": _safe(f_glassdoor),
+            "jobs":      _safe(f_jobs),
+        }
+
 NODE_INFO = {
-    "metadata_node":   ("Fetching company basics…",          "Company basics fetched"),
-    "research_node":   ("Searching interview experiences…",  "Interview data collected"),
-    "synthesize_node": ("Synthesizing with AI…",             "Synthesis complete"),
-    "question_node":   ("Generating questions…",             "Questions generated"),
+    "metadata_node":     ("Fetching company basics…",          "Company basics fetched"),
+    "research_parallel": ("Searching 3 sources in parallel…",  "All sources searched"),
+    "synthesize_node":   ("Synthesising with AI…",             "Synthesis complete"),
+    "question_node":     ("Generating questions…",             "Questions generated"),
 }
 
 def stream_research(company, role, focus):
@@ -420,25 +477,39 @@ def stream_research(company, role, focus):
         state["metadata"] = {"founded": "?", "hq": "?", "type": "?"}
     yield "metadata_node", {"metadata": state["metadata"]}
 
-    yield "research_node", {}
+    # ── Parallel research: 3 sources at the same time ────────────
+    yield "research_parallel", {}
+    sources = {"general": [], "glassdoor": [], "jobs": []}
     try:
-        state["research_data"] = _search(
-            f"{company} {role} interview experience questions {focus} 2024 2025"
-        )
+        sources = _research_all(company, role, focus)
     except Exception:
-        state["research_data"] = []
-    yield "research_node", {"research_data": state["research_data"]}
+        pass
+    state["research_data"]    = sources["general"]   # backward-compat
+    state["research_sources"] = sources
+    yield "research_parallel", {"research_sources": sources}
 
+    # ── Synthesis: structured prompt using all three sources ──────
     yield "synthesize_node", {}
     try:
-        block = "\n---\n".join(state["research_data"])
         meta  = state["metadata"]
+        parts = []
+        if sources.get("general"):
+            parts.append("INTERVIEW EXPERIENCES:\n" +
+                         "\n---\n".join(sources["general"]))
+        if sources.get("glassdoor"):
+            parts.append("GLASSDOOR REVIEWS & RATINGS:\n" +
+                         "\n---\n".join(sources["glassdoor"]))
+        if sources.get("jobs"):
+            parts.append("JOB REQUIREMENTS & SKILLS:\n" +
+                         "\n---\n".join(sources["jobs"]))
+        block = "\n\n".join(parts) or "(no search results found)"
         state["synthesis"] = _gemini(
-            f"Summarize {company} {role} interview prep for {focus}. Keep under 160 words.\n"
-            f"Founded {meta.get('founded','?')}, HQ {meta.get('hq','?')}.\n\n{block[:3000]}"
+            f"Summarise {company} {role} interview prep for {focus}. Keep under 180 words.\n"
+            f"Company: {company} | Founded: {meta.get('founded','?')} | HQ: {meta.get('hq','?')}\n\n"
+            f"{block[:3500]}"
         )
     except Exception as e:
-        state["synthesis"] = f"Could not synthesize: {e}"
+        state["synthesis"] = f"Could not synthesise: {e}"
     yield "synthesize_node", {"synthesis": state["synthesis"]}
 
     yield "question_node", {}
@@ -608,15 +679,39 @@ def page_research():
             if ev == "done":
                 final = data
                 status.update(label="✓ Research complete", state="complete", expanded=False)
+
             elif data:
-                if cur_node in NODE_INFO:
+                # ── Node completed — show result summary ──────────
+                if ev == "research_parallel":
+                    src = data.get("research_sources", {})
+                    ng  = len(src.get("general",   []))
+                    ngd = len(src.get("glassdoor", []))
+                    nj  = len(src.get("jobs",      []))
+                    slot.markdown(
+                        f"✅ Sources searched — "
+                        f"🔍 Web: **{ng}** &nbsp;|&nbsp; "
+                        f"⭐ Glassdoor: **{ngd}** &nbsp;|&nbsp; "
+                        f"💼 Jobs: **{nj}**"
+                    )
+                    slot = st.empty()
+                elif cur_node in NODE_INFO:
                     slot.markdown(f"✅ {NODE_INFO[cur_node][1]}")
                     slot = st.empty()
+
             else:
+                # ── Node starting — show spinner label ────────────
                 cur_node = ev
                 lbl = NODE_INFO.get(ev, (ev,))[0]
                 status.update(label=lbl)
-                slot.markdown(f"⏳ {lbl}")
+                if ev == "research_parallel":
+                    slot.markdown(
+                        "⏳ Searching 3 sources simultaneously…\n\n"
+                        "> 🔍 **Web** — interview experiences &nbsp;&nbsp;"
+                        "⭐ **Glassdoor** — ratings & reviews &nbsp;&nbsp;"
+                        "💼 **Job portals** — requirements & skills"
+                    )
+                else:
+                    slot.markdown(f"⏳ {lbl}")
 
     if not final:
         st.error("Research failed. Check your API keys in Settings.")
@@ -640,6 +735,22 @@ def page_research():
     )
     st.markdown("### Interview Summary")
     st.markdown(final.get("synthesis", ""))
+
+    # ── Source pill row ───────────────────────────────────────────
+    src = final.get("research_sources", {})
+    if src:
+        ng  = len(src.get("general",   []))
+        ngd = len(src.get("glassdoor", []))
+        nj  = len(src.get("jobs",      []))
+        st.markdown(
+            f'<div class="chip-row">'
+            f'<span class="chip">🔍 Web: {ng} result{"s" if ng != 1 else ""}</span>'
+            f'<span class="chip">⭐ Glassdoor: {ngd} review{"s" if ngd != 1 else ""}</span>'
+            f'<span class="chip">💼 Job portals: {nj} listing{"s" if nj != 1 else ""}</span>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
     _questions(final.get("questions", []), focus)
 
 
