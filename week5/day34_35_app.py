@@ -333,6 +333,23 @@ hr { border: none !important; border-top: 1px solid var(--border) !important; ma
   padding: 5px 13px; border: 1px solid var(--border); border-radius: 20px;
   font-size: 12px; color: var(--text-mid); background: #fff; line-height: 1.4;
 }
+
+/* Suggestion chip buttons — pill-shaped, small, no fill */
+div[data-testid="stHorizontalBlock"] .stButton > button[kind="secondary"] {
+  border-radius: 20px !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  padding: 5px 12px !important;
+  height: auto !important;
+  line-height: 1.4 !important;
+  color: var(--text-mid) !important;
+  border-color: var(--border) !important;
+}
+div[data-testid="stHorizontalBlock"] .stButton > button[kind="secondary"]:hover {
+  border-color: #999 !important;
+  color: var(--text-hi) !important;
+  transform: none !important;
+}
 .context-chip {
   display: inline-flex; align-items: center; gap: 6px;
   background: var(--blue-bg); border: 1px solid var(--blue-bd);
@@ -689,15 +706,17 @@ def page_research():
                     else:
                         st.warning("Could not detect a company name. Fill in the form below.")
 
-    # Static suggestion chips
+    # Clickable suggestion chips — each one populates & submits the form
     if cfg.get("show_chips", True):
-        st.markdown(
-            '<div class="chip-row">' +
-            "".join(f'<span class="chip">🔍 {c} · {r} · {f}</span>'
-                    for c, r, f in SUGGESTIONS) +
-            "</div>",
-            unsafe_allow_html=True,
-        )
+        chip_cols = st.columns(len(SUGGESTIONS))
+        for col, (c, r, f) in zip(chip_cols, SUGGESTIONS):
+            with col:
+                if st.button(f"🔍 {c} · {r} · {f}",
+                             key=f"chip_{c}",
+                             use_container_width=True,
+                             type="secondary"):
+                    st.session_state["_pf"] = (c, r, f)
+                    st.rerun()
 
     st.markdown("---")
 
