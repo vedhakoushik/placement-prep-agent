@@ -595,6 +595,64 @@ SUGGESTIONS = [
 ]
 FOCUS_OPTS = ["DSA", "System Design", "Behavioral", "SQL", "Low-Level Design"]
 
+_FILLERS = {
+    "research", "tell", "me", "about", "how", "what", "is", "the", "a", "an",
+    "interview", "company", "prepare", "for", "i", "want", "to", "know", "show",
+    "get", "find", "with", "focus", "on", "and", "or", "of", "in", "at", "do",
+    "can", "will", "should", "give", "search", "look", "up",
+}
+_ROLE_MAP = {
+    "sde": "SDE", "engineer": "SDE", "developer": "SDE",
+    "backend": "Backend Engineer", "frontend": "Frontend Engineer",
+    "fullstack": "Full Stack SDE", "full": "Full Stack SDE",
+    "pm": "PM", "manager": "PM", "product": "PM",
+    "analyst": "Data Analyst", "data": "Data Analyst",
+    "intern": "Intern", "fresher": "Fresher", "qa": "QA Engineer",
+    "devops": "DevOps Engineer",
+}
+_FOCUS_MAP = {
+    "system": "System Design", "design": "System Design",
+    "behavioral": "Behavioral", "hr": "Behavioral", "culture": "Behavioral",
+    "sql": "SQL", "database": "SQL", "db": "SQL",
+    "lld": "Low-Level Design", "low-level": "Low-Level Design",
+}
+
+def _parse_gen_query(text: str):
+    """
+    Parse a plain-English query into (company, role, focus).
+    Works for inputs like:
+      "Google"  |  "Flipkart SDE"  |  "Research Infosys fresher"
+      "Wipro backend engineer system design"  |  "TCS interview"
+    Returns ("", "SDE", "DSA") if no company can be detected.
+    """
+    words = text.strip().split()
+    significant = [
+        w.strip("?.,!") for w in words
+        if w.lower().strip("?.,!") not in _FILLERS and len(w.strip("?.,!")) > 1
+    ]
+    if not significant:
+        return "", "SDE", "DSA"
+
+    company = significant[0].title()
+
+    role = "SDE"
+    for word in words:
+        w = word.lower().strip("?.,!")
+        for kw, rv in _ROLE_MAP.items():
+            if kw in w:
+                role = rv
+                break
+
+    focus = "DSA"
+    for word in words:
+        w = word.lower().strip("?.,!")
+        for kw, fv in _FOCUS_MAP.items():
+            if kw in w:
+                focus = fv
+                break
+
+    return company, role, focus
+
 def page_research():
     _breadcrumb("Research")
     st.title("Research")
@@ -611,11 +669,25 @@ def page_research():
                              key="gen_input")
     with gc2:
         if st.button("Go →", key="go_btn"):
-            low = gen.lower()
-            for c, r, f in SUGGESTIONS:
-                if c.lower() in low:
-                    st.session_state["_pf"] = (c, r, f)
-                    st.rerun()
+            raw = gen.strip()
+            if not raw:
+                st.warning("Type a company name, e.g. 'Google SDE-2' or 'Infosys fresher'.")
+            else:
+                # 1. Check hardcoded suggestions first (exact match)
+                low, matched = raw.lower(), False
+                for c, r, f in SUGGESTIONS:
+                    if c.lower() in low:
+                        st.session_state["_pf"] = (c, r, f)
+                        matched = True
+                        st.rerun()
+                # 2. Parse any other company name from the text
+                if not matched:
+                    company, role, focus = _parse_gen_query(raw)
+                    if company:
+                        st.session_state["_pf"] = (company, role, focus)
+                        st.rerun()
+                    else:
+                        st.warning("Could not detect a company name. Fill in the form below.")
 
     # Static suggestion chips
     if cfg.get("show_chips", True):
@@ -757,36 +829,83 @@ def page_research():
     st.markdown("---")
     _company_card(company, role, final.get("metadata", {}))
     st.markdown(
-        f'<div style="margin:8px 0 16px">'
+        f'<div style="margin:8px 0 20px">'
         f'<span class="context-chip">📌 Context: '
-        f'<strong style="margin-left:4px">{company} · {focus}</strong></span></div>',
+        f'<strong style="margin-left:4px">{company} · {role} · {focus}</strong></span></div>',
         unsafe_allow_html=True,
     )
-    st.markdown("### Interview Summary")
-    st.markdown(final.get("synthesis", ""))
 
-    # ── Source pill row ───────────────────────────────────────────
-    src = final.get("research_sources", {})
-    if src:
-        ng  = len(src.get("general",   []))
-        ngd = len(src.get("glassdoor", []))
-        nj  = len(src.get("jobs",      []))
+    # ── 4-tab output: one tab per source + AI summary ─────────────
+    src            = final.get("research_sources", {})
+    general_data   = src.get("general",   [])
+    glassdoor_data = src.get("glassdoor", [])
+    jobs_data      = src.get("jobs",      [])
+
+    tab_web, tab_gd, tab_jobs, tab_ai = st.tabs([
+        f"🔍 Web  ({len(general_data)})",
+        f"⭐ Glassdoor  ({len(glassdoor_data)})",
+        f"💼 Job Portals  ({len(jobs_data)})",
+        "🤖 AI Summary",
+    ])
+
+    # ── Tab 1: Web search results ─────────────────────────────────
+    with tab_web:
         st.markdown(
-            f'<div class="chip-row">'
-            f'<span class="chip">🔍 Web: {ng} result{"s" if ng != 1 else ""}</span>'
-            f'<span class="chip">⭐ Glassdoor: {ngd} review{"s" if ngd != 1 else ""}</span>'
-            f'<span class="chip">💼 Job portals: {nj} listing{"s" if nj != 1 else ""}</span>'
-            f'</div>',
+            '<span class="sec-lbl">Web — Interview experiences &amp; DSA tips</span>',
             unsafe_allow_html=True,
         )
+        if general_data:
+            for i, snippet in enumerate(general_data, 1):
+                title = snippet[:72].rstrip() + ("…" if len(snippet) > 72 else "")
+                with st.expander(f"Result {i} — {title}"):
+                    st.markdown(snippet)
+        else:
+            st.info("No web results found. Try a different company name or role.")
 
-    _questions(final.get("questions", []), focus)
+    # ── Tab 2: Glassdoor ──────────────────────────────────────────
+    with tab_gd:
+        st.markdown(
+            '<span class="sec-lbl">Glassdoor — Ratings, culture &amp; interview difficulty</span>',
+            unsafe_allow_html=True,
+        )
+        if glassdoor_data:
+            for i, snippet in enumerate(glassdoor_data, 1):
+                title = snippet[:72].rstrip() + ("…" if len(snippet) > 72 else "")
+                with st.expander(f"Review {i} — {title}"):
+                    st.markdown(snippet)
+        else:
+            st.info("No Glassdoor reviews found for this company.")
+
+    # ── Tab 3: Job portals ────────────────────────────────────────
+    with tab_jobs:
+        st.markdown(
+            '<span class="sec-lbl">Job portals — Current JDs, required skills &amp; CTC</span>',
+            unsafe_allow_html=True,
+        )
+        if jobs_data:
+            for i, snippet in enumerate(jobs_data, 1):
+                title = snippet[:72].rstrip() + ("…" if len(snippet) > 72 else "")
+                with st.expander(f"Listing {i} — {title}"):
+                    st.markdown(snippet)
+        else:
+            st.info("No job listings found. Try a more specific role (e.g. 'Backend Engineer').")
+
+    # ── Tab 4: AI synthesis + questions ──────────────────────────
+    with tab_ai:
+        st.markdown("### Interview Summary")
+        st.markdown(final.get("synthesis", ""))
+        st.markdown("---")
+        _questions(final.get("questions", []), focus)
 
 
 # ════════════════════════════════════════════════════════════════════
 #  PAGE 2 — CHAT
 # ════════════════════════════════════════════════════════════════════
 def page_chat():
+    _breadcrumb("Chat")
+    st.title("Chat")
+    st.caption("Ask anything about placements, interview tips, or a specific company — no research needed.")
+
     cfg  = get_cfg()
     name = cfg.get("name", "") or "there"
 
@@ -795,7 +914,7 @@ def page_chat():
         st.session_state.chat_history = []
     chat_history = st.session_state.chat_history
 
-    # ── Context bar — always visible ──────────────────────────────
+    # ── Optional research context (only shown if research was done) ──
     selected = None
     company  = "general prep"
     focus    = cfg.get("default_focus", "DSA")
@@ -805,22 +924,30 @@ def page_chat():
     ctx_col, clr_col = st.columns([5, 1])
     with ctx_col:
         if companies:
-            selected = st.selectbox(
-                "", list(companies.keys()),
-                label_visibility="collapsed", key="chat_ctx",
+            # User has done research — offer to use that context
+            ctx_options = ["— no specific context —"] + list(companies.keys())
+            ctx_pick = st.selectbox(
+                "Load research context (optional)",
+                ctx_options,
+                key="chat_ctx",
             )
-            r       = companies[selected]
-            company = selected
-            focus   = r.get("focus", "DSA")
-            role    = r.get("role",  "Software Engineer")
+            if ctx_pick != "— no specific context —":
+                selected = ctx_pick
+                r        = companies[selected]
+                company  = selected
+                focus    = r.get("focus", "DSA")
+                role     = r.get("role",  "Software Engineer")
         else:
+            # No research done yet — plain text company hint
             typed = st.text_input(
-                "", placeholder="Type a company name to give context (optional)…",
-                label_visibility="collapsed", key="chat_co_input",
+                "Company context (optional)",
+                placeholder="e.g. Google, Infosys, TCS — leave blank for general prep",
+                key="chat_co_input",
             )
             if typed.strip():
                 company = typed.strip()
     with clr_col:
+        st.markdown("<div style='margin-top:24px'></div>", unsafe_allow_html=True)
         if st.button("New chat", type="secondary", key="clear_chat"):
             st.session_state.chat_history = []
             st.rerun()
