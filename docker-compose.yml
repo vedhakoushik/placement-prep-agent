@@ -1,41 +1,96 @@
 # ─────────────────────────────────────────────────────────────
-#  docker-compose.yml — Local Development  (Day 43)
+#  docker-compose.yml — Two-container production setup  (Day 43)
+#
+#  Container 1: chromadb  — vector database (official image, named volume)
+#  Container 2: app       — Streamlit front-end (built from Dockerfile)
+#
+#  Networking:  both containers share the default bridge network.
+#               The app reaches ChromaDB at http://chromadb:8000
+#               (Docker resolves service names as hostnames internally).
 #
 #  Usage:
-#    docker compose up          # start app (builds if needed)
-#    docker compose up --build  # force rebuild
-#    docker compose down        # stop and remove containers
-#    docker compose logs -f     # tail logs
+#    docker compose up           # start both containers
+#    docker compose up --build   # force rebuild of the app image
+#    docker compose down         # stop and remove containers
+#    docker compose down -v      # also wipe the chroma_data volume
+#    docker compose logs -f      # tail all logs
+#    docker compose logs chromadb  # logs from one service only
 # ─────────────────────────────────────────────────────────────
 
 services:
+
+  # ── Container 1: ChromaDB (vector database) ──────────────────
+  #
+  #  Uses the official chromadb/chroma image — no Dockerfile needed.
+  #  Data is stored in a named volume so it survives container restarts.
+  #  Port 8000 is exposed so local scripts (week3/) can also connect
+  #  when the stack is running.
+  #
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: placement-prep-chromadb
+
+    ports:
+      - "8000:8000"             # host:container
+
+    volumes:
+      - chroma_data:/chroma/chroma   # named volume — data persists across restarts
+
+    environment:
+      - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE   # opt-out of telemetry
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+    restart: unless-stopped
+
+
+  # ── Container 2: Streamlit app ────────────────────────────────
+  #
+  #  Built from our Dockerfile (multi-stage: builder + runtime).
+  #  Waits for chromadb to be healthy before starting.
+  #  CHROMA_HOST=chromadb tells src/chroma_client.py to use HttpClient
+  #  instead of PersistentClient — no code changes required.
+  #
   app:
     build:
       context: .
       dockerfile: Dockerfile
-      target: runtime       # use the final runtime stage
+      target: runtime             # use the final runtime stage only
 
     image: placement-prep:local
-
     container_name: placement-prep-app
 
     ports:
-      - "8501:8501"          # host:container
+      - "8501:8501"               # host:container
 
-    # Load API keys from .env file (never hard-code secrets here)
+    # Load API keys from .env (never hard-code secrets in this file)
     env_file:
       - .env
 
-    # Extra env overrides for local dev
     environment:
       - PYTHONUNBUFFERED=1
       - STREAMLIT_SERVER_HEADLESS=true
+      # Tell src/chroma_client.py to use HttpClient pointing at the
+      # chromadb container.  Docker resolves "chromadb" to the container IP.
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
 
-    # Mount source for live-reload during development
-    # Comment this out for a clean production-like run
+    # Wait until ChromaDB passes its health check before starting the app
+    depends_on:
+      chromadb:
+        condition: service_healthy
+
+    # Mount source for live-reload during development.
+    # Comment this out for a clean production-like run.
     volumes:
       - .:/app
-      - /app/__pycache__     # exclude pycache from mount
+      - /app/__pycache__          # exclude pycache from the mount
 
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
@@ -45,3 +100,13 @@ services:
       start_period: 15s
 
     restart: unless-stopped
+
+
+# ── Named volumes ──────────────────────────────────────────────
+#
+#  chroma_data is managed by Docker — it survives `docker compose down`
+#  but is removed by `docker compose down -v`.
+#
+volumes:
+  chroma_data:
+    driver: local
