@@ -275,33 +275,46 @@ div[data-baseweb="select"] > div {
 .sug-title { font-size: 13px; font-weight: 600; color: #111; line-height: 1.4; }
 .sug-desc  { font-size: 11.5px; color: #999; line-height: 1.55; margin-top: 2px; }
 
-/* ── Chat suggestion cards — entire button IS the card ────────────── */
-/* type="primary" maps to data-testid="baseButton-primary"            */
-/* white-space: pre-line renders \n in the label as a real line break  */
-button[data-testid="baseButton-primary"] {
+/* ── Chat suggestion cards — entire button IS the card ──────────────
+   .stButton(class) + button(tag) + [attr] = specificity 0,2,1
+   beats the main .stButton > button = 0,1,1, so these rules win.
+   white-space:pre-line lets the newline in the label render as a
+   visual line break (icon on line 1, title on line 2, desc on 3). */
+.stButton > button[data-testid="baseButton-primary"] {
   min-height: 150px !important;
   height: auto !important;
-  text-align: left !important;
-  white-space: pre-line !important;
   background: #fafafa !important;
+  color: #333 !important;
   border: 1px solid #e5e5e5 !important;
   border-radius: 14px !important;
   padding: 18px 16px 16px !important;
-  color: #555 !important;
   font-size: 13px !important;
   font-weight: 400 !important;
   line-height: 1.55 !important;
   box-shadow: none !important;
   transform: none !important;
+  text-align: left !important;
   justify-content: flex-start !important;
+  white-space: pre-line !important;
 }
-button[data-testid="baseButton-primary"]:hover {
+.stButton > button[data-testid="baseButton-primary"] p,
+.stButton > button[data-testid="baseButton-primary"] span {
+  white-space: pre-line !important;
+  text-align: left !important;
+  color: #333 !important;
+}
+.stButton > button[data-testid="baseButton-primary"]:hover {
+  background: #f0f0f0 !important;
   border-color: #bbb !important;
+  color: #111 !important;
   box-shadow: 0 4px 14px rgba(0,0,0,.07) !important;
   transform: translateY(-2px) !important;
-  background: #f5f5f5 !important;
+}
+.stButton > button[data-testid="baseButton-primary"]:hover p,
+.stButton > button[data-testid="baseButton-primary"]:hover span {
   color: #111 !important;
 }
+
 
 /* ── Chat messages ── */
 [data-testid="stChatMessage"] {
