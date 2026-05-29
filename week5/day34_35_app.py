@@ -134,6 +134,22 @@ CSS = """
   border-color: var(--border-hov) !important; color: var(--text-hi) !important;
   transform: none !important;
 }
+/* ── Chat suggestion cards — kind="primary" has spec 0,2,1 > 0,1,1 ── */
+.stButton > button[kind="primary"] {
+  background: #ffffff !important; color: #333333 !important;
+  border: 1px solid #e5e5e5 !important; border-radius: 14px !important;
+  min-height: 150px !important; height: auto !important;
+  padding: 18px 16px 16px !important; text-align: left !important;
+  justify-content: flex-start !important; white-space: pre-line !important;
+  font-size: 13px !important; font-weight: 400 !important;
+  line-height: 1.55 !important; box-shadow: none !important;
+  transform: none !important;
+}
+.stButton > button[kind="primary"]:hover {
+  background: #f5f5f5 !important; border-color: #bbb !important;
+  color: #111 !important; box-shadow: 0 4px 14px rgba(0,0,0,.07) !important;
+  transform: translateY(-2px) !important;
+}
 
 /* ── Form submit button (Run Research) ── */
 [data-testid="stFormSubmitButton"] button {
@@ -934,38 +950,6 @@ def page_chat():
              "Data-driven recommendation based on your researched companies.",
              "Based on my research sessions, which company should I prioritise and why?"),
         ]
-
-        # Inject card CSS here — body <style> is parsed AFTER emotion head
-        # styles, so it wins the cascade without affecting anything else.
-        st.markdown("""
-<style>
-button[data-testid="baseButton-primary"] {
-  background: #ffffff !important;
-  background-color: #ffffff !important;
-  color: #333333 !important;
-  border: 1px solid #e5e5e5 !important;
-  border-radius: 14px !important;
-  min-height: 150px !important;
-  height: auto !important;
-  padding: 18px 16px 16px !important;
-  text-align: left !important;
-  justify-content: flex-start !important;
-  white-space: pre-line !important;
-  font-size: 13px !important;
-  font-weight: 400 !important;
-  line-height: 1.55 !important;
-  box-shadow: none !important;
-  transform: none !important;
-}
-button[data-testid="baseButton-primary"]:hover {
-  background: #f5f5f5 !important;
-  background-color: #f5f5f5 !important;
-  border-color: #bbb !important;
-  color: #111 !important;
-  box-shadow: 0 4px 14px rgba(0,0,0,.07) !important;
-  transform: translateY(-2px) !important;
-}
-</style>""", unsafe_allow_html=True)
 
         triggered = None
         card_cols = st.columns(4)
