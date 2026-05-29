@@ -77,11 +77,14 @@ services:
       - placement-net                # ← internal network (app reaches this as "chromadb")
 
     healthcheck:                     # required for depends_on condition: service_healthy
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      # curl is NOT installed in the chromadb/chroma image — use Python instead.
+      # urllib is part of the Python standard library, always available.
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/heartbeat')"]
       interval: 15s
-      timeout: 5s
+      timeout: 10s
       retries: 5
-      start_period: 10s
+      start_period: 30s   # ChromaDB needs ~10-20s to start; give it extra headroom
 
     restart: unless-stopped
 
@@ -141,11 +144,12 @@ services:
       - /app/__pycache__             # but exclude pycache from the mount
 
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 20s
+      start_period: 30s
 
     restart: unless-stopped
 
