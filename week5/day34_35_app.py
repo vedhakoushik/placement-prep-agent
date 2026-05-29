@@ -115,23 +115,22 @@ CSS = """
 }
 [data-testid="stSidebar"] .stCaption p { color: var(--text-lo) !important; font-size: 11px !important; }
 
-/* ── Main buttons (exclude card suggestion buttons) ── */
-.stButton > button:not([data-testid="baseButton-primary"]) {
+/* ── Main buttons ── */
+.stButton > button {
   background: #111 !important; color: #fff !important;
   border: none !important; border-radius: 8px !important;
   font-size: 13px !important; font-weight: 500 !important;
   padding: 8px 20px !important; box-shadow: none !important;
   transition: background .15s, transform .15s !important;
 }
-.stButton > button:not([data-testid="baseButton-primary"]):hover {
+.stButton > button:hover {
   background: #333 !important; transform: translateY(-1px) !important;
 }
-/* Secondary buttons — use real data-testid, not kind attr */
-.stButton > button[data-testid="baseButton-secondary"] {
+.stButton > button[kind="secondary"] {
   background: transparent !important; color: var(--text-mid) !important;
   border: 1px solid var(--border) !important;
 }
-.stButton > button[data-testid="baseButton-secondary"]:hover {
+.stButton > button[kind="secondary"]:hover {
   border-color: var(--border-hov) !important; color: var(--text-hi) !important;
   transform: none !important;
 }
@@ -275,47 +274,6 @@ div[data-baseweb="select"] > div {
 .sug-icon { font-size: 20px; line-height: 1; }
 .sug-title { font-size: 13px; font-weight: 600; color: #111; line-height: 1.4; }
 .sug-desc  { font-size: 11.5px; color: #999; line-height: 1.55; margin-top: 2px; }
-
-/* ── Chat suggestion cards — entire button IS the card ──────────────
-   .stButton(class) + button(tag) + [attr] = specificity 0,2,1
-   beats the main .stButton > button = 0,1,1, so these rules win.
-   white-space:pre-line lets the newline in the label render as a
-   visual line break (icon on line 1, title on line 2, desc on 3). */
-.stButton > button[data-testid="baseButton-primary"] {
-  min-height: 150px !important;
-  height: auto !important;
-  background: #fafafa !important;
-  color: #333 !important;
-  border: 1px solid #e5e5e5 !important;
-  border-radius: 14px !important;
-  padding: 18px 16px 16px !important;
-  font-size: 13px !important;
-  font-weight: 400 !important;
-  line-height: 1.55 !important;
-  box-shadow: none !important;
-  transform: none !important;
-  text-align: left !important;
-  justify-content: flex-start !important;
-  white-space: pre-line !important;
-}
-.stButton > button[data-testid="baseButton-primary"] p,
-.stButton > button[data-testid="baseButton-primary"] span {
-  white-space: pre-line !important;
-  text-align: left !important;
-  color: #333 !important;
-}
-.stButton > button[data-testid="baseButton-primary"]:hover {
-  background: #f0f0f0 !important;
-  border-color: #bbb !important;
-  color: #111 !important;
-  box-shadow: 0 4px 14px rgba(0,0,0,.07) !important;
-  transform: translateY(-2px) !important;
-}
-.stButton > button[data-testid="baseButton-primary"]:hover p,
-.stButton > button[data-testid="baseButton-primary"]:hover span {
-  color: #111 !important;
-}
-
 
 /* ── Chat messages ── */
 [data-testid="stChatMessage"] {
@@ -976,6 +934,38 @@ def page_chat():
              "Data-driven recommendation based on your researched companies.",
              "Based on my research sessions, which company should I prioritise and why?"),
         ]
+
+        # Inject card CSS here — body <style> is parsed AFTER emotion head
+        # styles, so it wins the cascade without affecting anything else.
+        st.markdown("""
+<style>
+button[data-testid="baseButton-primary"] {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  color: #333333 !important;
+  border: 1px solid #e5e5e5 !important;
+  border-radius: 14px !important;
+  min-height: 150px !important;
+  height: auto !important;
+  padding: 18px 16px 16px !important;
+  text-align: left !important;
+  justify-content: flex-start !important;
+  white-space: pre-line !important;
+  font-size: 13px !important;
+  font-weight: 400 !important;
+  line-height: 1.55 !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+button[data-testid="baseButton-primary"]:hover {
+  background: #f5f5f5 !important;
+  background-color: #f5f5f5 !important;
+  border-color: #bbb !important;
+  color: #111 !important;
+  box-shadow: 0 4px 14px rgba(0,0,0,.07) !important;
+  transform: translateY(-2px) !important;
+}
+</style>""", unsafe_allow_html=True)
 
         triggered = None
         card_cols = st.columns(4)
