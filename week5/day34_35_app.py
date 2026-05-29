@@ -275,15 +275,25 @@ div[data-baseweb="select"] > div {
 .sug-title { font-size: 13px; font-weight: 600; color: #111; line-height: 1.4; }
 .sug-desc  { font-size: 11.5px; color: #999; line-height: 1.55; margin-top: 2px; }
 
-/* ── Hidden card trigger buttons ── */
-.sug-btn-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; max-width: 860px; margin: -10px auto 0; }
-.sug-btn-row .stButton > button {
-  background: transparent !important; color: transparent !important;
-  border: none !important; box-shadow: none !important;
-  height: 136px !important; margin-top: -146px !important;
-  border-radius: 14px !important; cursor: pointer !important;
-  transform: none !important; position: relative !important;
-  z-index: 10 !important; opacity: 0 !important;
+/* ── Suggestion card "Ask this →" buttons — fused to card bottom ── */
+div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] .stButton > button {
+  border-radius: 0 0 14px 14px !important;
+  border: 1px solid #e5e5e5 !important;
+  border-top: none !important;
+  background: #f4f4f4 !important;
+  color: #555 !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  padding: 8px 14px !important;
+  height: auto !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] .stButton > button:hover {
+  background: #ebebeb !important;
+  color: #111 !important;
+  transform: none !important;
+  box-shadow: none !important;
 }
 
 /* ── Chat messages ── */
@@ -987,15 +997,15 @@ def page_chat():
             unsafe_allow_html=True,
         )
 
-        # 4 suggestion cards — HTML visual layer
+        # 4 suggestion cards — card HTML + real button, one layer, no tricks
         CARDS = [
             ("🔍",
              f"Walk me through the {company} research",
-             "Key interview patterns, culture notes, and what rounds to expect.",
+             "Interview patterns, culture notes, and what rounds to expect.",
              f"Walk me through the {company} research — what are the interview patterns and key focus areas?"),
             ("💡",
              f"Give me a hard {focus} question",
-             f"A challenging practice problem for your {company} {role} interview.",
+             f"A challenging practice problem for the {company} {role} interview.",
              f"Give me a challenging {focus} interview question for {company} {role} — include hints"),
             ("📋",
              "Structure 'Tell me about yourself'",
@@ -1007,30 +1017,25 @@ def page_chat():
              "Based on my research sessions, which company should I prioritise and why?"),
         ]
 
-        # Visual cards row (HTML only — clickable overlay via buttons below)
-        st.markdown(
-            '<div class="sug-grid">' +
-            "".join(
-                f'<div class="sug-card">'
-                f'  <div class="sug-icon">{ic}</div>'
-                f'  <div class="sug-title">{ttl}</div>'
-                f'  <div class="sug-desc">{dsc}</div>'
-                f'</div>'
-                for ic, ttl, dsc, _ in CARDS
-            ) +
-            "</div>",
-            unsafe_allow_html=True,
-        )
-
-        # Invisible trigger buttons aligned to cards
-        st.markdown('<div class="sug-btn-row">', unsafe_allow_html=True)
         triggered = None
-        btn_cols = st.columns(4)
-        for i, ((_, ttl, _, prompt), col) in enumerate(zip(CARDS, btn_cols)):
+        card_cols = st.columns(4)
+        for i, ((ic, ttl, dsc, prompt), col) in enumerate(zip(CARDS, card_cols)):
             with col:
-                if st.button(ttl, key=f"sug_{i}", use_container_width=True):
+                # Card description (visual, not clickable)
+                st.markdown(
+                    f'<div style="border:1px solid #e5e5e5;border-bottom:none;'
+                    f'border-radius:14px 14px 0 0;padding:16px 14px 14px;'
+                    f'background:#fafafa;min-height:110px">'
+                    f'<div style="font-size:20px;line-height:1;margin-bottom:8px">{ic}</div>'
+                    f'<div style="font-size:13px;font-weight:600;color:#111;'
+                    f'margin-bottom:5px;line-height:1.35">{ttl}</div>'
+                    f'<div style="font-size:11.5px;color:#999;line-height:1.5">{dsc}</div>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+                # Actual clickable button fused to bottom of card
+                if st.button("Ask this →", key=f"sug_{i}", use_container_width=True):
                     triggered = prompt
-        st.markdown("</div>", unsafe_allow_html=True)
 
         if triggered:
             st.session_state.chat_history.append({"role": "user", "content": triggered})
