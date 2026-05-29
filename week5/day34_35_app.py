@@ -115,22 +115,23 @@ CSS = """
 }
 [data-testid="stSidebar"] .stCaption p { color: var(--text-lo) !important; font-size: 11px !important; }
 
-/* ── Main buttons ── */
-.stButton > button {
+/* ── Main buttons (exclude card suggestion buttons) ── */
+.stButton > button:not([data-testid="baseButton-primary"]) {
   background: #111 !important; color: #fff !important;
   border: none !important; border-radius: 8px !important;
   font-size: 13px !important; font-weight: 500 !important;
   padding: 8px 20px !important; box-shadow: none !important;
   transition: background .15s, transform .15s !important;
 }
-.stButton > button:hover {
+.stButton > button:not([data-testid="baseButton-primary"]):hover {
   background: #333 !important; transform: translateY(-1px) !important;
 }
-.stButton > button[kind="secondary"] {
+/* Secondary buttons — use real data-testid, not kind attr */
+.stButton > button[data-testid="baseButton-secondary"] {
   background: transparent !important; color: var(--text-mid) !important;
   border: 1px solid var(--border) !important;
 }
-.stButton > button[kind="secondary"]:hover {
+.stButton > button[data-testid="baseButton-secondary"]:hover {
   border-color: var(--border-hov) !important; color: var(--text-hi) !important;
   transform: none !important;
 }
