@@ -680,11 +680,31 @@ def _parse_gen_query(text: str):
 
     return company, role, focus
 
+def _src_header(icon: str, title: str, subtitle: str, count: int, color: str):
+    """Render a coloured section header for one search source."""
+    badge = f"{count} result{'s' if count != 1 else ''}"
+    st.markdown(
+        f'<div style="border-left:4px solid {color};padding:10px 16px;'
+        f'background:linear-gradient(90deg,{color}18,transparent);'
+        f'border-radius:0 8px 8px 0;margin:24px 0 10px">'
+        f'<div style="display:flex;justify-content:space-between;align-items:center">'
+        f'<div style="display:flex;align-items:center;gap:8px">'
+        f'<span style="font-size:18px">{icon}</span>'
+        f'<span style="font-size:14px;font-weight:700;color:#111">{title}</span>'
+        f'</div>'
+        f'<span style="font-size:11px;font-weight:600;color:{color};'
+        f'background:{color}22;padding:3px 10px;border-radius:20px">{badge}</span>'
+        f'</div>'
+        f'<div style="font-size:11.5px;color:#888;margin-top:3px;padding-left:26px">'
+        f'{subtitle}</div></div>',
+        unsafe_allow_html=True,
+    )
+
+
 def _show_research_results(final: dict):
     """
-    Render tabbed research results from a completed research dict.
-    Extracted so it can be called both immediately after research
-    AND when navigating back to the Research page.
+    Render research results with 3 clearly separated source sections
+    plus AI-generated questions. Called after search AND on navigation back.
     """
     company = final.get("company", "")
     role    = final.get("role",    "")
@@ -703,58 +723,63 @@ def _show_research_results(final: dict):
     glassdoor_data = src.get("glassdoor", [])
     jobs_data      = src.get("jobs",      [])
 
-    tab_web, tab_gd, tab_jobs, tab_ai = st.tabs([
-        f"🔍 Web  ({len(general_data)})",
-        f"⭐ Glassdoor  ({len(glassdoor_data)})",
-        f"💼 Job Portals  ({len(jobs_data)})",
-        "🤖 AI Summary",
-    ])
+    # ── Section 1: Web search ─────────────────────────────────────
+    _src_header("🔍", "Web Search",
+                "Interview experiences, DSA tips, forum discussions",
+                len(general_data), "#2563eb")
+    if general_data:
+        for i, s in enumerate(general_data, 1):
+            with st.expander(f"Result {i} — {s[:68].rstrip()}…"):
+                st.markdown(s)
+    else:
+        st.info("No web results found for this search.")
 
-    with tab_web:
-        st.markdown('<span class="sec-lbl">Web — Interview experiences &amp; DSA tips</span>',
-                    unsafe_allow_html=True)
-        if general_data:
-            for i, s in enumerate(general_data, 1):
-                with st.expander(f"Result {i} — {s[:70].rstrip()}…"):
-                    st.markdown(s)
-        else:
-            st.info("No web results found.")
+    # ── Section 2: Glassdoor ──────────────────────────────────────
+    _src_header("⭐", "Glassdoor",
+                "Company ratings, interview difficulty, culture & work-life reviews",
+                len(glassdoor_data), "#d97706")
+    if glassdoor_data:
+        for i, s in enumerate(glassdoor_data, 1):
+            with st.expander(f"Review {i} — {s[:68].rstrip()}…"):
+                st.markdown(s)
+    else:
+        st.info("No Glassdoor reviews found for this company.")
 
-    with tab_gd:
-        st.markdown('<span class="sec-lbl">Glassdoor — Ratings, culture &amp; interview difficulty</span>',
-                    unsafe_allow_html=True)
-        if glassdoor_data:
-            for i, s in enumerate(glassdoor_data, 1):
-                with st.expander(f"Review {i} — {s[:70].rstrip()}…"):
-                    st.markdown(s)
-        else:
-            st.info("No Glassdoor reviews found.")
+    # ── Section 3: Job portals ────────────────────────────────────
+    _src_header("💼", "Job Portals",
+                "Active JDs from Naukri, LinkedIn & Indeed — required skills & CTC",
+                len(jobs_data), "#16a34a")
+    if jobs_data:
+        for i, s in enumerate(jobs_data, 1):
+            with st.expander(f"Listing {i} — {s[:68].rstrip()}…"):
+                st.markdown(s)
+    else:
+        st.info("No job listings found. Try a more specific role.")
 
-    with tab_jobs:
-        st.markdown('<span class="sec-lbl">Job portals — Current JDs, required skills &amp; CTC</span>',
-                    unsafe_allow_html=True)
-        if jobs_data:
-            for i, s in enumerate(jobs_data, 1):
-                with st.expander(f"Listing {i} — {s[:70].rstrip()}…"):
-                    st.markdown(s)
-        else:
-            st.info("No job listings found.")
-
-    with tab_ai:
-        st.markdown("### Interview Summary")
-        st.markdown(final.get("synthesis", ""))
-        st.markdown("---")
-        _questions(final.get("questions", []), focus)
+    # ── Section 4: AI interview questions ─────────────────────────
+    _src_header("🤖", "AI-Generated Interview Questions",
+                f"Based on the 3 sources above — {focus} focus",
+                len(final.get("questions", [])), "#7c3aed")
+    st.markdown(final.get("synthesis", ""))
+    st.markdown("---")
+    _questions(final.get("questions", []), focus)
 
 
-def page_research():
-    _breadcrumb("Research")
-    st.title("Research")
-    st.caption("3 sources searched simultaneously — web interviews, Glassdoor reviews, and live job requirements.")
+def page_questions():
+    """
+    Interview Questions page.
+    Purpose: enter Company + Role → search 3 sources in parallel →
+             show each source's raw output in its own section →
+             show AI-generated interview questions.
+    NOT a chat / Q&A page — that is Chat.
+    """
+    _breadcrumb("Interview Questions")
+    st.title("Interview Questions")
+    st.caption("Enter a company and role — we search 3 sources simultaneously and generate targeted questions.")
 
     cfg = get_cfg()
 
-    # ── Clickable suggestion chips ────────────────────────────────
+    # ── Quick-fill chips ──────────────────────────────────────────
     if cfg.get("show_chips", True):
         chip_cols = st.columns(len(SUGGESTIONS))
         for col, (c, r, f) in zip(chip_cols, SUGGESTIONS):
@@ -766,44 +791,19 @@ def page_research():
                     st.session_state["_pf"] = (c, r, f)
                     st.rerun()
 
-    st.markdown("---")
-
-    # ── What the 3 parallel searches fetch ───────────────────────
-    st.markdown(
-        '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">'
-        '<div style="border:1px solid #e5e5e5;border-radius:10px;padding:16px 18px;background:#fafafa">'
-        '<div style="font-size:20px;margin-bottom:6px">🔍</div>'
-        '<div style="font-size:13px;font-weight:600;color:#111;margin-bottom:5px">Web search</div>'
-        '<div style="font-size:12px;color:#888;line-height:1.55">'
-        'Interview experiences, DSA tips, common questions from forums &amp; tech blogs'
-        '</div></div>'
-        '<div style="border:1px solid #e5e5e5;border-radius:10px;padding:16px 18px;background:#fafafa">'
-        '<div style="font-size:20px;margin-bottom:6px">⭐</div>'
-        '<div style="font-size:13px;font-weight:600;color:#111;margin-bottom:5px">Glassdoor</div>'
-        '<div style="font-size:12px;color:#888;line-height:1.55">'
-        'Company ratings, interview difficulty, culture &amp; work-life balance reviews'
-        '</div></div>'
-        '<div style="border:1px solid #e5e5e5;border-radius:10px;padding:16px 18px;background:#fafafa">'
-        '<div style="font-size:20px;margin-bottom:6px">💼</div>'
-        '<div style="font-size:13px;font-weight:600;color:#111;margin-bottom:5px">Job portals</div>'
-        '<div style="font-size:12px;color:#888;line-height:1.55">'
-        'Current JD requirements, must-have skills &amp; CTC from Naukri, LinkedIn &amp; Indeed'
-        '</div></div>'
-        '</div>',
-        unsafe_allow_html=True,
-    )
-
-    # ── Research form (single search interface) ───────────────────
+    # ── Form: Company + Role + Focus ──────────────────────────────
     pf = st.session_state.get("_pf", ("", "", cfg.get("default_focus", "DSA")))
 
-    with st.form("research_form"):
+    with st.form("questions_form"):
         fc1, fc2 = st.columns(2)
         with fc1:
-            company = st.text_input("Company", value=pf[0],
+            company = st.text_input("Company",
+                                    value=pf[0],
                                     placeholder="e.g. Google, Infosys, TCS")
         with fc2:
-            role = st.text_input("Role", value=pf[1],
-                                  placeholder="e.g. SDE-2, PM, Data Analyst")
+            role = st.text_input("Role",
+                                 value=pf[1],
+                                 placeholder="e.g. SDE-2, PM, Data Analyst, Fresher")
         try:
             focus = st.pills("Focus Area", FOCUS_OPTS,
                              default=pf[2] if pf[2] in FOCUS_OPTS else "DSA")
@@ -813,11 +813,11 @@ def page_research():
                              horizontal=True)
         fb1, fb2 = st.columns([3, 1])
         with fb1:
-            st.caption("🔍 Web  ·  ⭐ Glassdoor  ·  💼 Jobs  —  Tavily + Gemini")
+            st.caption("Searches Web · Glassdoor · Job Portals in parallel")
         with fb2:
-            run = st.form_submit_button("+ Run Research", use_container_width=True)
+            run = st.form_submit_button("Get Questions →", use_container_width=True)
 
-    # ── Run research only when form is submitted ──────────────────
+    # ── Run when form is submitted ────────────────────────────────
     if run:
         if not company or not role:
             st.warning("Please enter both Company and Role.")
@@ -825,20 +825,19 @@ def page_research():
             st.warning("Please select a Focus Area.")
         else:
             t0, final, cur_node = time.time(), {}, None
-            with st.status("Starting research…", expanded=True) as status:
+            with st.status("Searching 3 sources…", expanded=True) as status:
                 slot = st.empty()
                 for ev, data in stream_research(company, role, focus):
                     if ev == "done":
                         final = data
-                        status.update(label="✓ Research complete",
+                        status.update(label="✓ Done — 3 sources searched",
                                       state="complete", expanded=False)
                     elif data:
                         if ev == "research_parallel":
                             src = data.get("research_sources", {})
                             slot.markdown(
-                                f"✅ Sources — "
-                                f"🔍 Web: **{len(src.get('general',[]))}** &nbsp;|&nbsp; "
-                                f"⭐ Glassdoor: **{len(src.get('glassdoor',[]))}** &nbsp;|&nbsp; "
+                                f"✅ &nbsp;🔍 Web: **{len(src.get('general',[]))}** &nbsp;·&nbsp; "
+                                f"⭐ Glassdoor: **{len(src.get('glassdoor',[]))}** &nbsp;·&nbsp; "
                                 f"💼 Jobs: **{len(src.get('jobs',[]))}**"
                             )
                             slot = st.empty()
@@ -849,16 +848,10 @@ def page_research():
                         cur_node = ev
                         lbl = NODE_INFO.get(ev, (ev,))[0]
                         status.update(label=lbl)
-                        if ev == "research_parallel":
-                            slot.markdown(
-                                "⏳ Searching 3 sources simultaneously…\n\n"
-                                "> 🔍 **Web** &nbsp;&nbsp; ⭐ **Glassdoor** &nbsp;&nbsp; 💼 **Job portals**"
-                            )
-                        else:
-                            slot.markdown(f"⏳ {lbl}")
+                        slot.markdown(f"⏳ {lbl}")
 
             if not final:
-                st.error("Research failed. Check your API keys in Settings.")
+                st.error("Search failed. Check your API keys in Settings.")
             else:
                 final.update({"company": company, "role": role, "focus": focus})
                 st.session_state.research_results = final
@@ -868,7 +861,7 @@ def page_research():
                 log_research(company, role, focus,
                              len(final.get("questions", [])), time.time() - t0)
 
-    # ── Always show results if available (persists across navigation) ──
+    # ── Show results — persists across navigation ─────────────────
     if "research_results" in st.session_state:
         _show_research_results(st.session_state.research_results)
 
@@ -1248,7 +1241,7 @@ def page_settings():
 #  NAVIGATION
 # ════════════════════════════════════════════════════════════════════
 NAV_SECTIONS = {
-    "PREPARE": [("🔍  Research",     page_research),
+    "PREPARE": [("❓  Questions",    page_questions),
                 ("💬  Chat",         page_chat)],
     "MANAGE":  [("🏢  My Companies", page_companies)],
     "MORE":    [("📊  Progress",     page_progress),
@@ -1267,7 +1260,7 @@ def main():
 
     # ── Default page ──────────────────────────────────────────────
     if "nav_page" not in st.session_state:
-        st.session_state.nav_page = "🔍  Research"
+        st.session_state.nav_page = "❓  Questions"
 
     # ── Sidebar logo ──────────────────────────────────────────────
     st.sidebar.markdown(
