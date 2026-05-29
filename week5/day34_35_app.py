@@ -275,25 +275,32 @@ div[data-baseweb="select"] > div {
 .sug-title { font-size: 13px; font-weight: 600; color: #111; line-height: 1.4; }
 .sug-desc  { font-size: 11.5px; color: #999; line-height: 1.55; margin-top: 2px; }
 
-/* ── Suggestion card "Ask this →" buttons — fused to card bottom ── */
-div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] .stButton > button {
-  border-radius: 0 0 14px 14px !important;
-  border: 1px solid #e5e5e5 !important;
-  border-top: none !important;
-  background: #f4f4f4 !important;
-  color: #555 !important;
-  font-size: 12px !important;
-  font-weight: 500 !important;
-  padding: 8px 14px !important;
+/* ── Chat suggestion cards — entire button IS the card ────────────── */
+/* type="primary" maps to data-testid="baseButton-primary"            */
+/* white-space: pre-line renders \n in the label as a real line break  */
+button[data-testid="baseButton-primary"] {
+  min-height: 150px !important;
   height: auto !important;
-  transform: none !important;
+  text-align: left !important;
+  white-space: pre-line !important;
+  background: #fafafa !important;
+  border: 1px solid #e5e5e5 !important;
+  border-radius: 14px !important;
+  padding: 18px 16px 16px !important;
+  color: #555 !important;
+  font-size: 13px !important;
+  font-weight: 400 !important;
+  line-height: 1.55 !important;
   box-shadow: none !important;
+  transform: none !important;
+  justify-content: flex-start !important;
 }
-div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] .stButton > button:hover {
-  background: #ebebeb !important;
+button[data-testid="baseButton-primary"]:hover {
+  border-color: #bbb !important;
+  box-shadow: 0 4px 14px rgba(0,0,0,.07) !important;
+  transform: translateY(-2px) !important;
+  background: #f5f5f5 !important;
   color: #111 !important;
-  transform: none !important;
-  box-shadow: none !important;
 }
 
 /* ── Chat messages ── */
@@ -960,20 +967,15 @@ def page_chat():
         card_cols = st.columns(4)
         for i, ((ic, ttl, dsc, prompt), col) in enumerate(zip(CARDS, card_cols)):
             with col:
-                # Card description (visual, not clickable)
-                st.markdown(
-                    f'<div style="border:1px solid #e5e5e5;border-bottom:none;'
-                    f'border-radius:14px 14px 0 0;padding:16px 14px 14px;'
-                    f'background:#fafafa;min-height:110px">'
-                    f'<div style="font-size:20px;line-height:1;margin-bottom:8px">{ic}</div>'
-                    f'<div style="font-size:13px;font-weight:600;color:#111;'
-                    f'margin-bottom:5px;line-height:1.35">{ttl}</div>'
-                    f'<div style="font-size:11.5px;color:#999;line-height:1.5">{dsc}</div>'
-                    f'</div>',
-                    unsafe_allow_html=True,
-                )
-                # Actual clickable button fused to bottom of card
-                if st.button("Ask this →", key=f"sug_{i}", use_container_width=True):
+                # Single button = entire card. type="primary" → baseButton-primary
+                # CSS: white-space:pre-line renders \n as line break,
+                #      making the label multi-line inside the button.
+                if st.button(
+                    f"{ic}\n{ttl}\n{dsc}",
+                    key=f"sug_{i}",
+                    use_container_width=True,
+                    type="primary",
+                ):
                     triggered = prompt
 
         if triggered:
