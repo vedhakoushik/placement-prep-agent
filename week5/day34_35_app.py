@@ -598,7 +598,7 @@ FOCUS_OPTS = ["DSA", "System Design", "Behavioral", "SQL", "Low-Level Design"]
 def page_research():
     _breadcrumb("Research")
     st.title("Research")
-    st.caption("Analyse any company in seconds — interview patterns, culture, and custom questions.")
+    st.caption("3 sources searched simultaneously — web interviews, Glassdoor reviews, and live job requirements.")
 
     cfg = get_cfg()
 
@@ -629,6 +629,35 @@ def page_research():
 
     st.markdown("---")
 
+    # ── Source cards — what the 3 parallel searches fetch ─────────
+    st.markdown(
+        '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">'
+
+        '<div style="border:1px solid #e5e5e5;border-radius:10px;padding:16px 18px;background:#fafafa">'
+        '<div style="font-size:20px;margin-bottom:6px">🔍</div>'
+        '<div style="font-size:13px;font-weight:600;color:#111;margin-bottom:5px">Web search</div>'
+        '<div style="font-size:12px;color:#888;line-height:1.55">'
+        'Interview experiences, DSA tips, common questions from forums &amp; tech blogs'
+        '</div></div>'
+
+        '<div style="border:1px solid #e5e5e5;border-radius:10px;padding:16px 18px;background:#fafafa">'
+        '<div style="font-size:20px;margin-bottom:6px">⭐</div>'
+        '<div style="font-size:13px;font-weight:600;color:#111;margin-bottom:5px">Glassdoor</div>'
+        '<div style="font-size:12px;color:#888;line-height:1.55">'
+        'Company ratings, interview difficulty, culture &amp; work-life balance reviews'
+        '</div></div>'
+
+        '<div style="border:1px solid #e5e5e5;border-radius:10px;padding:16px 18px;background:#fafafa">'
+        '<div style="font-size:20px;margin-bottom:6px">💼</div>'
+        '<div style="font-size:13px;font-weight:600;color:#111;margin-bottom:5px">Job portals</div>'
+        '<div style="font-size:12px;color:#888;line-height:1.55">'
+        'Current JD requirements, must-have skills &amp; CTC from Naukri, LinkedIn &amp; Indeed'
+        '</div></div>'
+
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
     # ── Form card ─────────────────────────────────────────────────
     pf = st.session_state.get("_pf", ("", "", cfg.get("default_focus", "DSA")))
 
@@ -655,7 +684,7 @@ def page_research():
 
         fb1, fb2 = st.columns([3, 1])
         with fb1:
-            st.caption("Powered by Tavily + Gemini")
+            st.caption("🔍 Web  ·  ⭐ Glassdoor  ·  💼 Jobs  —  Tavily + Gemini")
         with fb2:
             run = st.form_submit_button("+ Run Research", use_container_width=True)
 
@@ -1204,7 +1233,7 @@ def main():
             '<div style="margin-top:12px">'
             '<span style="font-size:12px;color:#16a34a;font-weight:600">'
             '<span class="ai-dot"></span>AI Ready</span>'
-            '<div style="font-size:11px;color:#aaa;margin-top:3px">Week 5 · Day 36–37</div>'
+            '<div style="font-size:11px;color:#aaa;margin-top:3px">3 sources · parallel search</div>'
             '</div>',
             unsafe_allow_html=True,
         )
