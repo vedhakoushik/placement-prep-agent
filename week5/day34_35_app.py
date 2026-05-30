@@ -1096,7 +1096,7 @@ def page_companies():
 
     companies = st.session_state.get("companies", {})
     if not companies:
-        st.info("No companies yet. Go to Research to get started.")
+        st.info("No companies yet. Go to ❓ Questions or 💬 Chat and search for a company first.")
         return
 
     import pandas as pd
