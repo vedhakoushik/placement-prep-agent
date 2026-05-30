@@ -904,27 +904,36 @@ def _render_research_chat(msg: dict):
 def _chat_process(prompt: str):
     """
     Core handler for every chat message.
-    1. Detect company in the question.
-    2. If found → run 3 parallel searches (Web + Glassdoor + Jobs).
-    3. Pass sources as context to Gemini.
-    4. Return (answer, sources_dict).
+
+    Searches all 3 sources with the EXACT question as the query —
+    no fragile company-name extraction. Tavily finds what's relevant,
+    Gemini synthesises using those real results.
+
+    Sources used: Web (general) + Glassdoor + Job portals.
+    All 3 run in parallel via ThreadPoolExecutor.
     """
-    company, role, _ = _parse_gen_query(prompt)
-
-    # Ignore single filler words that match our parser but aren't company names
-    _noise = {"tell", "give", "what", "how", "which", "prepare", "help",
-              "about", "me", "explain", "describe", "sde", "pm"}
-    if company.lower() in _noise or len(company) < 2:
-        company = ""
-
-    sources: dict = {}
-    if company:
+    def _safe(future):
         try:
-            sources = _research_all(company, role or "SDE", "DSA")
+            return future.result(timeout=25)
         except Exception:
-            sources = {}
+            return []
 
-    # Build context from sources
+    # Search with the full question — reliable, no parsing errors
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        f_web = ex.submit(_search, prompt, 5)
+        f_gd  = ex.submit(_search_domains,
+                          prompt, ["glassdoor.com"], 3)
+        f_jobs = ex.submit(_search_domains,
+                           prompt,
+                           ["naukri.com", "linkedin.com", "indeed.com", "instahyre.com"],
+                           3)
+        sources = {
+            "general":   _safe(f_web),
+            "glassdoor": _safe(f_gd),
+            "jobs":      _safe(f_jobs),
+        }
+
+    # Build context
     ctx_parts = []
     if sources.get("general"):
         ctx_parts.append("WEB SEARCH:\n" + "\n".join(sources["general"][:3]))
@@ -937,18 +946,23 @@ def _chat_process(prompt: str):
     try:
         answer = _gemini(
             "You are a placement prep coach. Answer clearly and concisely.\n\n"
-            + (f"Real-time research context:\n{context[:2500]}\n\n" if context else "")
+            + (f"Real-time search results:\n{context[:2500]}\n\n" if context else "")
             + f"Student: {prompt}"
         )
     except Exception as e:
         answer = f"Error: {e}"
 
-    # Save to companies so My Companies page reflects what was researched in chat
+    # Best-effort: save to My Companies using capitalised words as company name
+    # (e.g. "tell me about Apple" → "Apple")
+    words = prompt.split()
+    cap_words = [w.strip("?.,!") for w in words
+                 if w[0].isupper() and len(w.strip("?.,!")) > 1]
+    company = cap_words[0] if cap_words else ""
     if company and sources and any(sources.values()):
         if "companies" not in st.session_state:
             st.session_state.companies = {}
         st.session_state.companies[company] = {
-            "role": role or "SDE", "focus": "DSA",
+            "role": "SDE", "focus": "DSA",
             "metadata": {}, "synthesis": answer[:400],
             "research_sources": sources, "questions": [],
         }
