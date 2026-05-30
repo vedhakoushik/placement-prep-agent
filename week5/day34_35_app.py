@@ -550,17 +550,29 @@ def stream_research(company, role, focus):
     yield "done", state
 
 def rag_answer(question, company):
-    context = ""
-    if "research_results" in st.session_state:
-        r    = st.session_state.research_results
-        meta = r.get("metadata", {})
-        context = (f"Company: {r.get('company')} | Role: {r.get('role')} | "
-                   f"Founded: {meta.get('founded','?')} | HQ: {meta.get('hq','?')}\n\n"
-                   f"Summary:\n{r.get('synthesis','')}")
+    """Answer a chat question, using 3-source research context if available."""
+    context_parts = []
+
+    # Use research from the chat thread (most recent research message)
+    companies = st.session_state.get("companies", {})
+    if company in companies:
+        d   = companies[company]
+        src = d.get("research_sources", {})
+        if src.get("general"):
+            context_parts.append("WEB:\n" + "\n".join(src["general"][:3]))
+        if src.get("glassdoor"):
+            context_parts.append("GLASSDOOR:\n" + "\n".join(src["glassdoor"][:2]))
+        if src.get("jobs"):
+            context_parts.append("JOBS:\n" + "\n".join(src["jobs"][:2]))
+        if d.get("synthesis"):
+            context_parts.append("SUMMARY:\n" + d["synthesis"])
+
+    context = "\n\n".join(context_parts)
     try:
         return _gemini(
             f"You are a placement prep coach. Answer clearly and concisely.\n\n"
-            f"Context about {company}:\n{context[:2000]}\n\nStudent: {question}"
+            f"Research context for {company}:\n{context[:2500]}\n\n"
+            f"Student: {question}"
         )
     except Exception as e:
         return f"Error: {e}"
@@ -762,17 +774,15 @@ def _show_research_results(final: dict):
 
 def page_questions():
     """
-    Interview Questions page.
-    Purpose: enter Company + Role → search 3 sources in parallel →
-             show each source's raw output in its own section →
-             show AI-generated interview questions.
-    NOT a chat / Q&A page — that is Chat.
+    Interview Questions page — fast, Gemini-only, no web searches.
+    For deep 3-source research use the Chat page Research expander.
     """
     _breadcrumb("Interview Questions")
     st.title("Interview Questions")
-    st.caption("Enter a company and role — we search 3 sources simultaneously and generate targeted questions.")
+    st.caption("Enter company and role — Gemini generates targeted questions instantly.")
 
     cfg = get_cfg()
+    nq  = cfg.get("num_questions", 5)
 
     # ── Quick-fill chips ──────────────────────────────────────────
     if cfg.get("show_chips", True):
@@ -786,18 +796,16 @@ def page_questions():
                     st.session_state["_pf"] = (c, r, f)
                     st.rerun()
 
-    # ── Form: Company + Role + Focus ──────────────────────────────
+    # ── Form ──────────────────────────────────────────────────────
     pf = st.session_state.get("_pf", ("", "", cfg.get("default_focus", "DSA")))
 
     with st.form("questions_form"):
         fc1, fc2 = st.columns(2)
         with fc1:
-            company = st.text_input("Company",
-                                    value=pf[0],
+            company = st.text_input("Company", value=pf[0],
                                     placeholder="e.g. Google, Infosys, TCS")
         with fc2:
-            role = st.text_input("Role",
-                                 value=pf[1],
+            role = st.text_input("Role", value=pf[1],
                                  placeholder="e.g. SDE-2, PM, Data Analyst, Fresher")
         try:
             focus = st.pills("Focus Area", FOCUS_OPTS,
@@ -808,92 +816,164 @@ def page_questions():
                              horizontal=True)
         fb1, fb2 = st.columns([3, 1])
         with fb1:
-            st.caption("Searches Web · Glassdoor · Job Portals in parallel")
+            st.caption("Powered by Gemini  ·  For deep research go to 💬 Chat")
         with fb2:
             run = st.form_submit_button("Get Questions →", use_container_width=True)
 
-    # ── Run when form is submitted ────────────────────────────────
+    # ── Generate directly with Gemini — no web searches ───────────
     if run:
         if not company or not role:
             st.warning("Please enter both Company and Role.")
         elif not focus:
             st.warning("Please select a Focus Area.")
         else:
-            t0, final, cur_node = time.time(), {}, None
-            with st.status("Searching 3 sources…", expanded=True) as status:
-                slot = st.empty()
-                for ev, data in stream_research(company, role, focus):
-                    if ev == "done":
-                        final = data
-                        status.update(label="✓ Done — 3 sources searched",
-                                      state="complete", expanded=False)
-                    elif data:
-                        if ev == "research_parallel":
-                            src = data.get("research_sources", {})
-                            slot.markdown(
-                                f"✅ &nbsp;🔍 Web: **{len(src.get('general',[]))}** &nbsp;·&nbsp; "
-                                f"⭐ Glassdoor: **{len(src.get('glassdoor',[]))}** &nbsp;·&nbsp; "
-                                f"💼 Jobs: **{len(src.get('jobs',[]))}**"
-                            )
-                            slot = st.empty()
-                        elif cur_node in NODE_INFO:
-                            slot.markdown(f"✅ {NODE_INFO[cur_node][1]}")
-                            slot = st.empty()
-                    else:
-                        cur_node = ev
-                        lbl = NODE_INFO.get(ev, (ev,))[0]
-                        status.update(label=lbl)
-                        slot.markdown(f"⏳ {lbl}")
+            with st.spinner(f"Generating {nq} {focus} questions for {company} {role}…"):
+                try:
+                    text = _gemini(
+                        f"Generate exactly {nq} {focus} interview questions for a "
+                        f"{role} position at {company}.\n"
+                        f"Format each as: Q1. <question> [Easy/Medium/Hard]\n"
+                        f"Mix difficulty levels. Be specific to {company}'s known interview style."
+                    )
+                    parts = re.split(r"\n(?=Q\d+\.)", text.strip())
+                    questions = [p.strip() for p in parts if p.strip()] or [text.strip()]
+                    st.session_state["_qs_result"] = {
+                        "company": company, "role": role,
+                        "focus": focus, "questions": questions,
+                    }
+                except Exception as e:
+                    st.error(f"Could not generate questions: {e}")
 
-            if not final:
-                st.error("Search failed. Check your API keys in Settings.")
-            else:
-                final.update({"company": company, "role": role, "focus": focus})
-                st.session_state.research_results = final
-                if "companies" not in st.session_state:
-                    st.session_state.companies = {}
-                st.session_state.companies[company] = final
-                log_research(company, role, focus,
-                             len(final.get("questions", [])), time.time() - t0)
-
-    # ── Show results — persists across navigation ─────────────────
-    if "research_results" in st.session_state:
-        _show_research_results(st.session_state.research_results)
+    # ── Show questions — persists across navigation ───────────────
+    if "_qs_result" in st.session_state:
+        res = st.session_state["_qs_result"]
+        st.markdown("---")
+        _src_header("🤖", f"{res['focus']} Questions",
+                    f"{res['company']} · {res['role']}",
+                    len(res["questions"]), "#7c3aed")
+        _questions(res["questions"], res["focus"])
 
 
 # ════════════════════════════════════════════════════════════════════
 #  PAGE 2 — CHAT
 # ════════════════════════════════════════════════════════════════════
+def _render_research_chat(msg: dict):
+    """Render a research message in the chat thread (3 coloured sections)."""
+    co   = msg.get("company", "")
+    role = msg.get("role",    "")
+    src  = msg.get("sources", {})
+
+    st.markdown(
+        f'<div style="margin:4px 0 12px">'
+        f'<span class="context-chip">🔍 Research — {co} · {role}</span></div>',
+        unsafe_allow_html=True,
+    )
+    _src_header("🔍", "Web Search",
+                "Interview forums, DSA tips, tech blogs",
+                len(src.get("general", [])), "#2563eb")
+    for i, s in enumerate(src.get("general", []), 1):
+        with st.expander(f"Result {i} — {s[:65]}…"):
+            st.markdown(s)
+
+    _src_header("⭐", "Glassdoor",
+                "Ratings, interview difficulty, culture reviews",
+                len(src.get("glassdoor", [])), "#d97706")
+    for i, s in enumerate(src.get("glassdoor", []), 1):
+        with st.expander(f"Review {i} — {s[:65]}…"):
+            st.markdown(s)
+
+    _src_header("💼", "Job Portals",
+                "Current JDs, required skills & CTC from Naukri, LinkedIn & Indeed",
+                len(src.get("jobs", [])), "#16a34a")
+    for i, s in enumerate(src.get("jobs", []), 1):
+        with st.expander(f"Listing {i} — {s[:65]}…"):
+            st.markdown(s)
+
+    if msg.get("synthesis"):
+        st.markdown("---")
+        st.markdown("**AI Summary**")
+        st.markdown(msg["synthesis"])
+
+
 def page_chat():
     _breadcrumb("Chat")
     st.title("Chat")
-    st.caption("Ask anything about placements, interview tips, or a specific company — no research needed.")
+    st.caption("Ask anything — or research a company first to get richer, source-backed answers.")
 
     cfg  = get_cfg()
     name = cfg.get("name", "") or "there"
 
-    companies = st.session_state.get("companies", {})
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
     chat_history = st.session_state.chat_history
 
-    # ── Optional research context (only shown if research was done) ──
-    selected = None
-    company  = "general prep"
-    focus    = cfg.get("default_focus", "DSA")
-    role     = "Software Engineer"
-    r        = {}
+    # ── Research expander — runs 3 parallel searches → adds to chat ──
+    with st.expander("🔍 Research a company first (Web + Glassdoor + Job Portals)", expanded=False):
+        rc1, rc2 = st.columns(2)
+        r_co   = rc1.text_input("Company", key="chat_r_co",
+                                 placeholder="e.g. Google, Infosys, TCS")
+        r_role = rc2.text_input("Role",    key="chat_r_role",
+                                 placeholder="e.g. SDE-2, Backend Engineer, Fresher")
+        if st.button("Research →", key="chat_r_btn"):
+            if not r_co or not r_role:
+                st.warning("Enter both Company and Role.")
+            else:
+                with st.status(f"Searching 3 sources for {r_co}…", expanded=True) as status:
+                    sources = _research_all(r_co, r_role, "DSA")
+                    status.update(
+                        label=(
+                            f"✓ Done — "
+                            f"🔍 {len(sources.get('general',[]))} &nbsp;·&nbsp; "
+                            f"⭐ {len(sources.get('glassdoor',[]))} &nbsp;·&nbsp; "
+                            f"💼 {len(sources.get('jobs',[]))}"
+                        ),
+                        state="complete", expanded=False,
+                    )
+
+                parts = []
+                if sources.get("general"):
+                    parts.append("WEB:\n" + "\n".join(sources["general"]))
+                if sources.get("glassdoor"):
+                    parts.append("GLASSDOOR:\n" + "\n".join(sources["glassdoor"]))
+                if sources.get("jobs"):
+                    parts.append("JOBS:\n" + "\n".join(sources["jobs"]))
+
+                try:
+                    synthesis = _gemini(
+                        f"Summarise {r_co} {r_role} interview prep in under 100 words.\n\n"
+                        + "\n\n".join(parts)[:3000]
+                    )
+                except Exception:
+                    synthesis = ""
+
+                chat_history.append({
+                    "role": "research",
+                    "company": r_co, "role_val": r_role,
+                    "sources": sources, "synthesis": synthesis,
+                })
+                if "companies" not in st.session_state:
+                    st.session_state.companies = {}
+                st.session_state.companies[r_co] = {
+                    "role": r_role, "focus": "DSA",
+                    "research_sources": sources,
+                    "synthesis": synthesis, "questions": [],
+                }
+                st.rerun()
+
+    # ── Active company context (from research done above) ────────────
+    companies = st.session_state.get("companies", {})
+    selected  = None
+    company   = "general prep"
+    focus     = cfg.get("default_focus", "DSA")
+    role      = "Software Engineer"
+    r         = {}
 
     ctx_col, clr_col = st.columns([5, 1])
     with ctx_col:
         if companies:
-            # User has done research — offer to use that context
             ctx_options = ["— no specific context —"] + list(companies.keys())
-            ctx_pick = st.selectbox(
-                "Load research context (optional)",
-                ctx_options,
-                key="chat_ctx",
-            )
+            ctx_pick = st.selectbox("Active context", ctx_options, key="chat_ctx",
+                                    label_visibility="collapsed")
             if ctx_pick != "— no specific context —":
                 selected = ctx_pick
                 r        = companies[selected]
@@ -901,16 +981,13 @@ def page_chat():
                 focus    = r.get("focus", "DSA")
                 role     = r.get("role",  "Software Engineer")
         else:
-            # No research done yet — plain text company hint
             typed = st.text_input(
-                "Company context (optional)",
-                placeholder="e.g. Google, Infosys, TCS — leave blank for general prep",
-                key="chat_co_input",
+                "", placeholder="Company name for context (optional)",
+                label_visibility="collapsed", key="chat_co_input",
             )
             if typed.strip():
                 company = typed.strip()
     with clr_col:
-        st.markdown("<div style='margin-top:24px'></div>", unsafe_allow_html=True)
         if st.button("New chat", type="secondary", key="clear_chat"):
             st.session_state.chat_history = []
             st.rerun()
@@ -987,8 +1064,11 @@ def page_chat():
             )
 
         for msg in chat_history:
-            with st.chat_message(msg["role"]):
-                st.markdown(msg["content"])
+            if msg.get("role") == "research":
+                _render_research_chat(msg)
+            else:
+                with st.chat_message(msg["role"]):
+                    st.markdown(msg["content"])
 
     # ══════════════════════════════════════════════════════════════
     #  Input bar — always visible
