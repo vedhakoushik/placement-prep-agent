@@ -952,20 +952,52 @@ def _chat_process(prompt: str):
     except Exception as e:
         answer = f"Error: {e}"
 
-    # Best-effort: save to My Companies using capitalised words as company name
-    # (e.g. "tell me about Apple" → "Apple")
-    words = prompt.split()
+    # ── Detect company + role + focus from the question ─────────────
+    # Use capitalised words as company name (user types "Apple" → saved as Apple)
+    words     = prompt.split()
     cap_words = [w.strip("?.,!") for w in words
-                 if w[0].isupper() and len(w.strip("?.,!")) > 1]
-    company = cap_words[0] if cap_words else ""
+                 if len(w) > 1 and w.strip("?.,!")[0].isupper()]
+    company   = cap_words[0] if cap_words else ""
+
+    # Detect role from question keywords
+    role = "SDE"
+    for w in words:
+        w_lower = w.lower().strip("?.,!")
+        if w_lower in {"pm", "manager"}:              role = "PM";                  break
+        if w_lower in {"analyst", "data"}:            role = "Data Analyst";        break
+        if "backend" in w_lower:                      role = "Backend Engineer";    break
+        if "frontend" in w_lower:                     role = "Frontend Engineer";   break
+        if "fullstack" in w_lower or "full" in w_lower: role = "Full Stack SDE";   break
+        if "fresher" in w_lower or "intern" in w_lower: role = "Fresher";          break
+        if w_lower.startswith("sde"):                 role = w.strip("?.,!").upper(); break
+
+    # Detect focus from question keywords
+    focus = "DSA"
+    low = prompt.lower()
+    if "system design" in low:            focus = "System Design"
+    elif "behavioral" in low or "hr" in low: focus = "Behavioral"
+    elif "sql" in low or "database" in low:  focus = "SQL"
+    elif "lld" in low or "low-level" in low: focus = "Low-Level Design"
+
+    # ── Save to My Companies + Progress ─────────────────────────────
     if company and sources and any(sources.values()):
         if "companies" not in st.session_state:
             st.session_state.companies = {}
+
+        # Merge with any existing entry for the same company
+        existing = st.session_state.companies.get(company, {})
         st.session_state.companies[company] = {
-            "role": "SDE", "focus": "DSA",
-            "metadata": {}, "synthesis": answer[:400],
-            "research_sources": sources, "questions": [],
+            "role":             role,
+            "focus":            focus,
+            "metadata":         existing.get("metadata", {}),
+            "synthesis":        answer[:500],
+            "research_sources": sources,
+            "questions":        existing.get("questions", []),
         }
+
+        # Log to Progress — same format as page_questions()
+        log_research(company, role, focus,
+                     len(existing.get("questions", [])), 0)
 
     return answer, sources
 
