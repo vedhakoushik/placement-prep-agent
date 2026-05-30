@@ -1002,6 +1002,46 @@ def _chat_process(prompt: str):
     return answer, sources
 
 
+def _render_sources_columns(sources: dict):
+    """
+    Render Web / Glassdoor / Job Portals results in 3 side-by-side
+    coloured panels — like the screenshot where each model's answer
+    appears in its own column simultaneously.
+    """
+    panels = [
+        ("🔍", "Web Search",   "#eff6ff", "#2563eb", "#bfdbfe", sources.get("general",   [])),
+        ("⭐", "Glassdoor",    "#fffbeb", "#d97706", "#fde68a",  sources.get("glassdoor", [])),
+        ("💼", "Job Portals",  "#f0fdf4", "#16a34a", "#bbf7d0",  sources.get("jobs",      [])),
+    ]
+
+    c1, c2, c3 = st.columns(3, gap="small")
+    for col, (ic, title, bg, color, border, snippets) in zip([c1, c2, c3], panels):
+        with col:
+            # Build snippet HTML (pure HTML so it's inside the panel div)
+            if snippets:
+                rows = "".join(
+                    f'<div style="font-size:12px;color:#333;line-height:1.55;'
+                    f'padding:8px 0;border-bottom:1px solid #f0f0f0">'
+                    f'{s[:380]}{"…" if len(s)>380 else ""}</div>'
+                    for s in snippets[:4]
+                )
+            else:
+                rows = '<p style="font-size:12px;color:#999;margin:0">No results found.</p>'
+
+            st.markdown(
+                f'<div style="border:1px solid {border};border-radius:10px;'
+                f'overflow:hidden;height:100%">'
+                f'<div style="background:{bg};padding:10px 14px;'
+                f'font-size:13px;font-weight:700;color:{color};'
+                f'border-bottom:1px solid {border};'
+                f'display:flex;align-items:center;gap:6px">'
+                f'{ic}&nbsp;{title}</div>'
+                f'<div style="padding:10px 14px;background:#fff">{rows}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+
 def page_chat():
     _breadcrumb("Chat")
     st.title("Chat")
@@ -1067,7 +1107,7 @@ def page_chat():
                     triggered = card_prompt
 
         if triggered:
-            with st.spinner("🔍 Searching sources…"):
+            with st.spinner("🔍 Searching 3 sources…"):
                 ans, srcs = _chat_process(triggered)
             chat_history.append({"role": "user",      "content": triggered})
             chat_history.append({"role": "assistant", "content": ans, "sources": srcs})
@@ -1075,41 +1115,24 @@ def page_chat():
 
     # ══════════════════════════════════════════════════════════════
     #  CHAT STATE — render conversation
+    #  Structure per exchange:
+    #    [User bubble]
+    #    [3-column: Web | Glassdoor | Jobs]   ← outside bubble, full width
+    #    [Assistant bubble with AI answer]
     # ══════════════════════════════════════════════════════════════
     else:
         for msg in chat_history:
-            with st.chat_message(msg["role"]):
-                st.markdown(msg["content"])
-                # If sources were fetched for this message, show them collapsed
+            if msg["role"] == "user":
+                with st.chat_message("user"):
+                    st.markdown(msg["content"])
+            else:
+                # 3-column sources panel (full width, outside chat bubble)
                 srcs = msg.get("sources", {})
                 if srcs and any(srcs.values()):
-                    ng  = len(srcs.get("general",   []))
-                    ngd = len(srcs.get("glassdoor", []))
-                    nj  = len(srcs.get("jobs",      []))
-                    with st.expander(
-                        f"🔍 Web: {ng}  ·  ⭐ Glassdoor: {ngd}  ·  💼 Jobs: {nj}",
-                        expanded=False,
-                    ):
-                        _src_header("🔍", "Web Search",
-                                    "Interview forums, DSA tips, tech blogs",
-                                    ng, "#2563eb")
-                        for i, s in enumerate(srcs.get("general", []), 1):
-                            with st.expander(f"Result {i} — {s[:65]}…"):
-                                st.markdown(s)
-
-                        _src_header("⭐", "Glassdoor",
-                                    "Ratings, difficulty, culture reviews",
-                                    ngd, "#d97706")
-                        for i, s in enumerate(srcs.get("glassdoor", []), 1):
-                            with st.expander(f"Review {i} — {s[:65]}…"):
-                                st.markdown(s)
-
-                        _src_header("💼", "Job Portals",
-                                    "JDs, required skills & CTC — Naukri, LinkedIn, Indeed",
-                                    nj, "#16a34a")
-                        for i, s in enumerate(srcs.get("jobs", []), 1):
-                            with st.expander(f"Listing {i} — {s[:65]}…"):
-                                st.markdown(s)
+                    _render_sources_columns(srcs)
+                # AI answer
+                with st.chat_message("assistant"):
+                    st.markdown(msg["content"])
 
     # ══════════════════════════════════════════════════════════════
     #  Chat input — always visible
@@ -1118,15 +1141,16 @@ def page_chat():
         with st.chat_message("user"):
             st.markdown(prompt)
 
+        with st.spinner("🔍 Searching Web · Glassdoor · Job Portals…"):
+            ans, srcs = _chat_process(prompt)
+
+        # 3-column sources panel (full width)
+        if srcs and any(srcs.values()):
+            _render_sources_columns(srcs)
+
+        # AI answer
         with st.chat_message("assistant"):
-            with st.spinner("🔍 Searching sources…"):
-                ans, srcs = _chat_process(prompt)
             st.markdown(ans)
-            if srcs and any(srcs.values()):
-                ng  = len(srcs.get("general",   []))
-                ngd = len(srcs.get("glassdoor", []))
-                nj  = len(srcs.get("jobs",      []))
-                st.caption(f"Sources searched — 🔍 Web: {ng}  ·  ⭐ Glassdoor: {ngd}  ·  💼 Jobs: {nj}")
 
         chat_history.append({"role": "user",      "content": prompt})
         chat_history.append({"role": "assistant", "content": ans, "sources": srcs})
