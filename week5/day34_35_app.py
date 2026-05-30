@@ -837,10 +837,16 @@ def page_questions():
                     )
                     parts = re.split(r"\n(?=Q\d+\.)", text.strip())
                     questions = [p.strip() for p in parts if p.strip()] or [text.strip()]
-                    st.session_state["_qs_result"] = {
+                    result = {
                         "company": company, "role": role,
                         "focus": focus, "questions": questions,
+                        "metadata": {}, "synthesis": "", "research_sources": {},
                     }
+                    st.session_state["_qs_result"] = result
+                    # Also save to companies so My Companies page shows it
+                    if "companies" not in st.session_state:
+                        st.session_state.companies = {}
+                    st.session_state.companies[company] = result
                 except Exception as e:
                     st.error(f"Could not generate questions: {e}")
 
@@ -936,6 +942,16 @@ def _chat_process(prompt: str):
         )
     except Exception as e:
         answer = f"Error: {e}"
+
+    # Save to companies so My Companies page reflects what was researched in chat
+    if company and sources and any(sources.values()):
+        if "companies" not in st.session_state:
+            st.session_state.companies = {}
+        st.session_state.companies[company] = {
+            "role": role or "SDE", "focus": "DSA",
+            "metadata": {}, "synthesis": answer[:400],
+            "research_sources": sources, "questions": [],
+        }
 
     return answer, sources
 
