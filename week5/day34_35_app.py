@@ -398,10 +398,29 @@ div[data-testid="stHorizontalBlock"] .stButton > button[kind="secondary"]:hover 
 # ════════════════════════════════════════════════════════════════════
 def _gemini(prompt: str) -> str:
     import google.generativeai as genai
-    cfg = get_cfg()
+    cfg   = get_cfg()
     genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
     model = genai.GenerativeModel(cfg.get("gemini_model", "gemini-2.5-flash"))
-    return model.generate_content(prompt).text.strip()
+
+    # Retry once on transient errors; raise a readable message on quota errors
+    for attempt in range(2):
+        try:
+            return model.generate_content(prompt).text.strip()
+        except Exception as exc:
+            msg = str(exc)
+            if "429" in msg:
+                raise RuntimeError(
+                    "⚠️ Gemini API rate limit reached.\n\n"
+                    "**gemini-2.5-flash** free tier allows only 20 requests / day.\n"
+                    "Fix options:\n"
+                    "- Switch to **gemini-1.5-flash** in ⚙️ Settings (higher free quota).\n"
+                    "- Wait ~24 hours for the quota to reset.\n"
+                    "- Add a paid API key."
+                ) from exc
+            if attempt == 0:
+                time.sleep(3)   # wait 3 s before one retry for transient errors
+            else:
+                raise
 
 def _search(query: str, max_results: int = 5) -> list:
     from tavily import TavilyClient
@@ -1002,11 +1021,21 @@ def _chat_process(prompt: str):
     return answer, sources
 
 
+def _clean_snippet(text: str) -> str:
+    """Strip markdown links, bare URLs, and HTML tags from a Tavily snippet."""
+    # [link text](url) → link text
+    text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)
+    # bare URLs
+    text = re.sub(r'https?://\S+', '', text)
+    # any remaining HTML tags
+    text = re.sub(r'<[^>]+>', '', text)
+    return text.strip()
+
+
 def _render_sources_columns(sources: dict):
     """
     Render Web / Glassdoor / Job Portals results in 3 side-by-side
-    coloured panels — like the screenshot where each model's answer
-    appears in its own column simultaneously.
+    coloured panels — clean text, no hyperlinks, clearly readable.
     """
     panels = [
         ("🔍", "Web Search",   "#eff6ff", "#2563eb", "#bfdbfe", sources.get("general",   [])),
@@ -1017,26 +1046,27 @@ def _render_sources_columns(sources: dict):
     c1, c2, c3 = st.columns(3, gap="small")
     for col, (ic, title, bg, color, border, snippets) in zip([c1, c2, c3], panels):
         with col:
-            # Build snippet HTML (pure HTML so it's inside the panel div)
             if snippets:
                 rows = "".join(
-                    f'<div style="font-size:12px;color:#333;line-height:1.55;'
-                    f'padding:8px 0;border-bottom:1px solid #f0f0f0">'
-                    f'{s[:380]}{"…" if len(s)>380 else ""}</div>'
+                    f'<div style="font-size:13px;color:#1a1a1a;line-height:1.6;'
+                    f'padding:10px 0;border-bottom:1px solid #eeeeee">'
+                    f'{_clean_snippet(s)[:420]}{"…" if len(s)>420 else ""}'
+                    f'</div>'
                     for s in snippets[:4]
                 )
             else:
-                rows = '<p style="font-size:12px;color:#999;margin:0">No results found.</p>'
+                rows = (
+                    '<p style="font-size:13px;color:#888;margin:8px 0">'
+                    'No results found for this query.</p>'
+                )
 
             st.markdown(
-                f'<div style="border:1px solid {border};border-radius:10px;'
-                f'overflow:hidden;height:100%">'
-                f'<div style="background:{bg};padding:10px 14px;'
-                f'font-size:13px;font-weight:700;color:{color};'
-                f'border-bottom:1px solid {border};'
-                f'display:flex;align-items:center;gap:6px">'
-                f'{ic}&nbsp;{title}</div>'
-                f'<div style="padding:10px 14px;background:#fff">{rows}</div>'
+                f'<div style="border:1px solid {border};border-radius:10px;overflow:hidden">'
+                f'<div style="background:{bg};padding:11px 16px;'
+                f'font-size:14px;font-weight:700;color:{color};'
+                f'border-bottom:1px solid {border};letter-spacing:-.01em">'
+                f'{ic}&nbsp; {title}</div>'
+                f'<div style="padding:4px 16px 12px;background:#fff">{rows}</div>'
                 f'</div>',
                 unsafe_allow_html=True,
             )
