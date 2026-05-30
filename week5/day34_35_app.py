@@ -895,10 +895,58 @@ def _render_research_chat(msg: dict):
         st.markdown(msg["synthesis"])
 
 
+def _chat_process(prompt: str):
+    """
+    Core handler for every chat message.
+    1. Detect company in the question.
+    2. If found → run 3 parallel searches (Web + Glassdoor + Jobs).
+    3. Pass sources as context to Gemini.
+    4. Return (answer, sources_dict).
+    """
+    company, role, _ = _parse_gen_query(prompt)
+
+    # Ignore single filler words that match our parser but aren't company names
+    _noise = {"tell", "give", "what", "how", "which", "prepare", "help",
+              "about", "me", "explain", "describe", "sde", "pm"}
+    if company.lower() in _noise or len(company) < 2:
+        company = ""
+
+    sources: dict = {}
+    if company:
+        try:
+            sources = _research_all(company, role or "SDE", "DSA")
+        except Exception:
+            sources = {}
+
+    # Build context from sources
+    ctx_parts = []
+    if sources.get("general"):
+        ctx_parts.append("WEB SEARCH:\n" + "\n".join(sources["general"][:3]))
+    if sources.get("glassdoor"):
+        ctx_parts.append("GLASSDOOR:\n" + "\n".join(sources["glassdoor"][:2]))
+    if sources.get("jobs"):
+        ctx_parts.append("JOB PORTALS:\n" + "\n".join(sources["jobs"][:2]))
+    context = "\n\n".join(ctx_parts)
+
+    try:
+        answer = _gemini(
+            "You are a placement prep coach. Answer clearly and concisely.\n\n"
+            + (f"Real-time research context:\n{context[:2500]}\n\n" if context else "")
+            + f"Student: {prompt}"
+        )
+    except Exception as e:
+        answer = f"Error: {e}"
+
+    return answer, sources
+
+
 def page_chat():
     _breadcrumb("Chat")
     st.title("Chat")
-    st.caption("Ask anything — or research a company first to get richer, source-backed answers.")
+    st.caption(
+        "Ask anything — when you mention a company, "
+        "we automatically search Web + Glassdoor + Job Portals to back the answer."
+    )
 
     cfg  = get_cfg()
     name = cfg.get("name", "") or "there"
@@ -907,185 +955,119 @@ def page_chat():
         st.session_state.chat_history = []
     chat_history = st.session_state.chat_history
 
-    # ── Research expander — runs 3 parallel searches → adds to chat ──
-    with st.expander("🔍 Research a company first (Web + Glassdoor + Job Portals)", expanded=False):
-        rc1, rc2 = st.columns(2)
-        r_co   = rc1.text_input("Company", key="chat_r_co",
-                                 placeholder="e.g. Google, Infosys, TCS")
-        r_role = rc2.text_input("Role",    key="chat_r_role",
-                                 placeholder="e.g. SDE-2, Backend Engineer, Fresher")
-        if st.button("Research →", key="chat_r_btn"):
-            if not r_co or not r_role:
-                st.warning("Enter both Company and Role.")
-            else:
-                with st.status(f"Searching 3 sources for {r_co}…", expanded=True) as status:
-                    sources = _research_all(r_co, r_role, "DSA")
-                    status.update(
-                        label=(
-                            f"✓ Done — "
-                            f"🔍 {len(sources.get('general',[]))} &nbsp;·&nbsp; "
-                            f"⭐ {len(sources.get('glassdoor',[]))} &nbsp;·&nbsp; "
-                            f"💼 {len(sources.get('jobs',[]))}"
-                        ),
-                        state="complete", expanded=False,
-                    )
-
-                parts = []
-                if sources.get("general"):
-                    parts.append("WEB:\n" + "\n".join(sources["general"]))
-                if sources.get("glassdoor"):
-                    parts.append("GLASSDOOR:\n" + "\n".join(sources["glassdoor"]))
-                if sources.get("jobs"):
-                    parts.append("JOBS:\n" + "\n".join(sources["jobs"]))
-
-                try:
-                    synthesis = _gemini(
-                        f"Summarise {r_co} {r_role} interview prep in under 100 words.\n\n"
-                        + "\n\n".join(parts)[:3000]
-                    )
-                except Exception:
-                    synthesis = ""
-
-                chat_history.append({
-                    "role": "research",
-                    "company": r_co, "role_val": r_role,
-                    "sources": sources, "synthesis": synthesis,
-                })
-                if "companies" not in st.session_state:
-                    st.session_state.companies = {}
-                st.session_state.companies[r_co] = {
-                    "role": r_role, "focus": "DSA",
-                    "research_sources": sources,
-                    "synthesis": synthesis, "questions": [],
-                }
-                st.rerun()
-
-    # ── Active company context (from research done above) ────────────
-    companies = st.session_state.get("companies", {})
-    selected  = None
-    company   = "general prep"
-    focus     = cfg.get("default_focus", "DSA")
-    role      = "Software Engineer"
-    r         = {}
-
-    ctx_col, clr_col = st.columns([5, 1])
-    with ctx_col:
-        if companies:
-            ctx_options = ["— no specific context —"] + list(companies.keys())
-            ctx_pick = st.selectbox("Active context", ctx_options, key="chat_ctx",
-                                    label_visibility="collapsed")
-            if ctx_pick != "— no specific context —":
-                selected = ctx_pick
-                r        = companies[selected]
-                company  = selected
-                focus    = r.get("focus", "DSA")
-                role     = r.get("role",  "Software Engineer")
-        else:
-            typed = st.text_input(
-                "", placeholder="Company name for context (optional)",
-                label_visibility="collapsed", key="chat_co_input",
-            )
-            if typed.strip():
-                company = typed.strip()
-    with clr_col:
-        if st.button("New chat", type="secondary", key="clear_chat"):
-            st.session_state.chat_history = []
-            st.rerun()
+    # ── Single "New chat" button — top right ──────────────────────
+    if st.button("New chat", type="secondary", key="clear_chat"):
+        st.session_state.chat_history = []
+        st.rerun()
 
     # ══════════════════════════════════════════════════════════════
-    #  HERO STATE — no messages yet
+    #  HERO STATE — no messages yet, show greeting + suggestion cards
     # ══════════════════════════════════════════════════════════════
     if not chat_history:
-        # Large greeting
         st.markdown(
             f'<div class="chat-hero">'
             f'  <div class="chat-greeting">'
             f'    <span class="hello-hi">Hello, </span>'
             f'    <span class="hello-name">{name}</span>'
             f'  </div>'
-            f'  <div class="chat-sub">How can I help you prep today?</div>'
+            f'  <div class="chat-sub">Ask anything — I\'ll search the web for you.</div>'
             f'</div>',
             unsafe_allow_html=True,
         )
 
-        # 4 suggestion cards — card HTML + real button, one layer, no tricks
         CARDS = [
             ("🔍",
-             f"Walk me through the {company} research",
-             "Interview patterns, culture notes, and what rounds to expect.",
-             f"Walk me through the {company} research — what are the interview patterns and key focus areas?"),
+             "Research Google SDE-2",
+             "Web + Glassdoor + Jobs searched automatically.",
+             "Research Google SDE-2 interview — include web experiences, Glassdoor ratings, and current job requirements."),
             ("💡",
-             f"Give me a hard {focus} question",
-             f"A challenging practice problem for the {company} {role} interview.",
-             f"Give me a challenging {focus} interview question for {company} {role} — include hints"),
+             "Give me a hard DSA question",
+             "Challenging problem with hints and approach.",
+             "Give me a challenging DSA interview question with hints and a step-by-step approach."),
             ("📋",
              "Structure 'Tell me about yourself'",
-             "Build a compelling 90-second intro for tech interviews.",
-             "Help me write a compelling 'tell me about yourself' answer for a tech interview"),
+             "Build a compelling 90-second intro.",
+             "Help me write a compelling 'tell me about yourself' answer for a tech interview."),
             ("📊",
-             "Which company should I target first?",
-             "Data-driven recommendation based on your researched companies.",
-             "Based on my research sessions, which company should I prioritise and why?"),
+             "Best companies for freshers 2025",
+             "Ranked picks based on hiring patterns.",
+             "Which companies are best for fresh engineers in India in 2025 and why?"),
         ]
 
         triggered = None
         card_cols = st.columns(4)
-        for i, ((ic, ttl, dsc, prompt), col) in enumerate(zip(CARDS, card_cols)):
+        for i, ((ic, ttl, dsc, card_prompt), col) in enumerate(zip(CARDS, card_cols)):
             with col:
-                # Single button = entire card. type="primary" → baseButton-primary
-                # CSS: white-space:pre-line renders \n as line break,
-                #      making the label multi-line inside the button.
-                if st.button(
-                    f"{ic}\n{ttl}\n{dsc}",
-                    key=f"sug_{i}",
-                    use_container_width=True,
-                    type="primary",
-                ):
-                    triggered = prompt
+                if st.button(f"{ic}\n{ttl}\n{dsc}",
+                             key=f"sug_{i}",
+                             use_container_width=True,
+                             type="primary"):
+                    triggered = card_prompt
 
         if triggered:
-            st.session_state.chat_history.append({"role": "user", "content": triggered})
-            with st.spinner("Thinking…"):
-                ans = rag_answer(triggered, selected or company)
-            st.session_state.chat_history.append({"role": "assistant", "content": ans})
+            with st.spinner("🔍 Searching sources…"):
+                ans, srcs = _chat_process(triggered)
+            chat_history.append({"role": "user",      "content": triggered})
+            chat_history.append({"role": "assistant", "content": ans, "sources": srcs})
             st.rerun()
 
     # ══════════════════════════════════════════════════════════════
-    #  CHAT STATE — conversation in progress
+    #  CHAT STATE — render conversation
     # ══════════════════════════════════════════════════════════════
     else:
-        if selected:
-            st.markdown(
-                f'<div style="margin-bottom:14px">'
-                f'<span class="context-chip">📌 {selected} '
-                f'· {r.get("role","?")} · {r.get("focus","?")}</span>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-
         for msg in chat_history:
-            if msg.get("role") == "research":
-                _render_research_chat(msg)
-            else:
-                with st.chat_message(msg["role"]):
-                    st.markdown(msg["content"])
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+                # If sources were fetched for this message, show them collapsed
+                srcs = msg.get("sources", {})
+                if srcs and any(srcs.values()):
+                    ng  = len(srcs.get("general",   []))
+                    ngd = len(srcs.get("glassdoor", []))
+                    nj  = len(srcs.get("jobs",      []))
+                    with st.expander(
+                        f"🔍 Web: {ng}  ·  ⭐ Glassdoor: {ngd}  ·  💼 Jobs: {nj}",
+                        expanded=False,
+                    ):
+                        _src_header("🔍", "Web Search",
+                                    "Interview forums, DSA tips, tech blogs",
+                                    ng, "#2563eb")
+                        for i, s in enumerate(srcs.get("general", []), 1):
+                            with st.expander(f"Result {i} — {s[:65]}…"):
+                                st.markdown(s)
+
+                        _src_header("⭐", "Glassdoor",
+                                    "Ratings, difficulty, culture reviews",
+                                    ngd, "#d97706")
+                        for i, s in enumerate(srcs.get("glassdoor", []), 1):
+                            with st.expander(f"Review {i} — {s[:65]}…"):
+                                st.markdown(s)
+
+                        _src_header("💼", "Job Portals",
+                                    "JDs, required skills & CTC — Naukri, LinkedIn, Indeed",
+                                    nj, "#16a34a")
+                        for i, s in enumerate(srcs.get("jobs", []), 1):
+                            with st.expander(f"Listing {i} — {s[:65]}…"):
+                                st.markdown(s)
 
     # ══════════════════════════════════════════════════════════════
-    #  Input bar — always visible
+    #  Chat input — always visible
     # ══════════════════════════════════════════════════════════════
-    if prompt := st.chat_input(f"Ask anything about {company} prep…"):
-        st.session_state.chat_history.append({"role": "user", "content": prompt})
+    if prompt := st.chat_input("Ask anything — mention a company to get real-time research…"):
         with st.chat_message("user"):
             st.markdown(prompt)
+
         with st.chat_message("assistant"):
-            with st.spinner("Thinking…"):
-                ans = rag_answer(prompt, selected or company)
+            with st.spinner("🔍 Searching sources…"):
+                ans, srcs = _chat_process(prompt)
             st.markdown(ans)
-            if selected:
-                st.caption(f"Based on {selected} research · {focus}")
-            elif company != "general prep":
-                st.caption(f"Answering about {company} · no research context loaded")
-        st.session_state.chat_history.append({"role": "assistant", "content": ans})
+            if srcs and any(srcs.values()):
+                ng  = len(srcs.get("general",   []))
+                ngd = len(srcs.get("glassdoor", []))
+                nj  = len(srcs.get("jobs",      []))
+                st.caption(f"Sources searched — 🔍 Web: {ng}  ·  ⭐ Glassdoor: {ngd}  ·  💼 Jobs: {nj}")
+
+        chat_history.append({"role": "user",      "content": prompt})
+        chat_history.append({"role": "assistant", "content": ans, "sources": srcs})
 
 
 # ════════════════════════════════════════════════════════════════════
