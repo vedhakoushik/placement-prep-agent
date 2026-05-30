@@ -937,22 +937,19 @@ def _chat_process(prompt: str):
         except Exception:
             return []
 
-    # Search with the full question — reliable, no parsing errors
+    # 3 parallel searches with the full question
     with ThreadPoolExecutor(max_workers=3) as ex:
-        f_web = ex.submit(_search, prompt, 5)
-        f_gd  = ex.submit(_search_domains,
-                          prompt, ["glassdoor.com"], 3)
-        f_jobs = ex.submit(_search_domains,
-                           prompt,
-                           ["naukri.com", "linkedin.com", "indeed.com", "instahyre.com"],
-                           3)
+        f_web  = ex.submit(_search, prompt, 5)
+        f_gd   = ex.submit(_search_domains, prompt, ["glassdoor.com"], 3)
+        f_jobs = ex.submit(_search_domains, prompt,
+                           ["naukri.com", "linkedin.com", "indeed.com", "instahyre.com"], 3)
         sources = {
             "general":   _safe(f_web),
             "glassdoor": _safe(f_gd),
             "jobs":      _safe(f_jobs),
         }
 
-    # Build context
+    # Build raw context for Gemini
     ctx_parts = []
     if sources.get("general"):
         ctx_parts.append("WEB SEARCH:\n" + "\n".join(sources["general"][:3]))
@@ -962,14 +959,39 @@ def _chat_process(prompt: str):
         ctx_parts.append("JOB PORTALS:\n" + "\n".join(sources["jobs"][:2]))
     context = "\n\n".join(ctx_parts)
 
+    # ONE structured Gemini call — returns per-source summaries + full answer
+    structured_prompt = (
+        "You are a placement prep coach. Based on the search results, respond EXACTLY in this format:\n\n"
+        "WEB: [2-3 sentences summarising what interview forums and blogs say about this topic]\n"
+        "GLASSDOOR: [2-3 sentences summarising company ratings, culture, and interview difficulty]\n"
+        "JOBS: [2-3 sentences summarising required skills, salary, and job requirements]\n"
+        "ANSWER: [a clear, helpful 4-6 sentence answer to the student's question]\n\n"
+        f"Search results:\n{context[:3000]}\n\n"
+        f"Student question: {prompt}"
+    )
+
+    summaries = {"general": "", "glassdoor": "", "jobs": ""}
     try:
-        answer = _gemini(
-            "You are a placement prep coach. Answer clearly and concisely.\n\n"
-            + (f"Real-time search results:\n{context[:2500]}\n\n" if context else "")
-            + f"Student: {prompt}"
-        )
-    except Exception as e:
-        answer = f"Error: {e}"
+        raw = _gemini(structured_prompt)
+
+        def _section(tag: str) -> str:
+            m = re.search(
+                rf'(?:^|\n){tag}:\s*(.*?)(?=\n(?:WEB|GLASSDOOR|JOBS|ANSWER):|$)',
+                raw, re.DOTALL | re.IGNORECASE,
+            )
+            return m.group(1).strip() if m else ""
+
+        summaries = {
+            "general":   _section("WEB"),
+            "glassdoor": _section("GLASSDOOR"),
+            "jobs":      _section("JOBS"),
+        }
+        answer = _section("ANSWER") or raw  # fallback to full response if parsing fails
+
+    except RuntimeError as exc:   # friendly rate-limit message from _gemini()
+        answer = str(exc)
+    except Exception as exc:
+        answer = f"Error: {exc}"
 
     # ── Detect company + role + focus from the question ─────────────
     # Use capitalised words as company name (user types "Apple" → saved as Apple)
@@ -1018,7 +1040,7 @@ def _chat_process(prompt: str):
         log_research(company, role, focus,
                      len(existing.get("questions", [])), 0)
 
-    return answer, sources
+    return answer, sources, summaries
 
 
 def _clean_snippet(text: str) -> str:
@@ -1032,42 +1054,36 @@ def _clean_snippet(text: str) -> str:
     return text.strip()
 
 
-def _render_sources_columns(sources: dict):
+def _render_sources_columns(summaries: dict):
     """
-    Render Web / Glassdoor / Job Portals results in 3 side-by-side
-    coloured panels — clean text, no hyperlinks, clearly readable.
+    Render Web / Glassdoor / Job Portals synthesised summaries in 3
+    side-by-side coloured panels. Each cell shows a clean 2-3 sentence
+    AI summary of that source — not raw snippets.
+    summaries keys: 'general', 'glassdoor', 'jobs'  (string values)
     """
     panels = [
-        ("🔍", "Web Search",   "#eff6ff", "#2563eb", "#bfdbfe", sources.get("general",   [])),
-        ("⭐", "Glassdoor",    "#fffbeb", "#d97706", "#fde68a",  sources.get("glassdoor", [])),
-        ("💼", "Job Portals",  "#f0fdf4", "#16a34a", "#bbf7d0",  sources.get("jobs",      [])),
+        ("🔍", "Web Search",   "#eff6ff", "#2563eb", "#bfdbfe", summaries.get("general",   "")),
+        ("⭐", "Glassdoor",    "#fffbeb", "#d97706", "#fde68a",  summaries.get("glassdoor", "")),
+        ("💼", "Job Portals",  "#f0fdf4", "#16a34a", "#bbf7d0",  summaries.get("jobs",      "")),
     ]
 
     c1, c2, c3 = st.columns(3, gap="small")
-    for col, (ic, title, bg, color, border, snippets) in zip([c1, c2, c3], panels):
+    for col, (ic, title, bg, color, border, text) in zip([c1, c2, c3], panels):
         with col:
-            if snippets:
-                rows = "".join(
-                    f'<div style="font-size:13px;color:#1a1a1a;line-height:1.6;'
-                    f'padding:10px 0;border-bottom:1px solid #eeeeee">'
-                    f'{_clean_snippet(s)[:420]}{"…" if len(s)>420 else ""}'
-                    f'</div>'
-                    for s in snippets[:4]
-                )
-            else:
-                rows = (
-                    '<p style="font-size:13px;color:#888;margin:8px 0">'
-                    'No results found for this query.</p>'
-                )
-
+            body = (
+                f'<p style="font-size:13.5px;color:#1a1a1a;line-height:1.65;margin:0">'
+                f'{text}</p>'
+                if text else
+                '<p style="font-size:13px;color:#999;margin:0">'
+                'No data found for this query.</p>'
+            )
             st.markdown(
                 f'<div style="border:1px solid {border};border-radius:10px;overflow:hidden">'
-                f'<div style="background:{bg};padding:11px 16px;'
-                f'font-size:14px;font-weight:700;color:{color};'
-                f'border-bottom:1px solid {border};letter-spacing:-.01em">'
+                f'<div style="background:{bg};padding:11px 16px;font-size:14px;'
+                f'font-weight:700;color:{color};border-bottom:1px solid {border}">'
                 f'{ic}&nbsp; {title}</div>'
-                f'<div style="padding:4px 16px 12px;background:#fff">{rows}</div>'
-                f'</div>',
+                f'<div style="padding:14px 16px;background:#fff;min-height:80px">'
+                f'{body}</div></div>',
                 unsafe_allow_html=True,
             )
 
@@ -1138,9 +1154,10 @@ def page_chat():
 
         if triggered:
             with st.spinner("🔍 Searching 3 sources…"):
-                ans, srcs = _chat_process(triggered)
+                ans, srcs, sums = _chat_process(triggered)
             chat_history.append({"role": "user",      "content": triggered})
-            chat_history.append({"role": "assistant", "content": ans, "sources": srcs})
+            chat_history.append({"role": "assistant", "content": ans,
+                                  "sources": srcs, "summaries": sums})
             st.rerun()
 
     # ══════════════════════════════════════════════════════════════
@@ -1156,10 +1173,10 @@ def page_chat():
                 with st.chat_message("user"):
                     st.markdown(msg["content"])
             else:
-                # 3-column sources panel (full width, outside chat bubble)
-                srcs = msg.get("sources", {})
-                if srcs and any(srcs.values()):
-                    _render_sources_columns(srcs)
+                # 3-column summaries panel (full width, outside chat bubble)
+                sums = msg.get("summaries", {})
+                if sums and any(sums.values()):
+                    _render_sources_columns(sums)
                 # AI answer
                 with st.chat_message("assistant"):
                     st.markdown(msg["content"])
@@ -1172,18 +1189,19 @@ def page_chat():
             st.markdown(prompt)
 
         with st.spinner("🔍 Searching Web · Glassdoor · Job Portals…"):
-            ans, srcs = _chat_process(prompt)
+            ans, srcs, sums = _chat_process(prompt)
 
-        # 3-column sources panel (full width)
-        if srcs and any(srcs.values()):
-            _render_sources_columns(srcs)
+        # 3-column synthesised summaries (full width, outside chat bubble)
+        if sums and any(sums.values()):
+            _render_sources_columns(sums)
 
         # AI answer
         with st.chat_message("assistant"):
             st.markdown(ans)
 
         chat_history.append({"role": "user",      "content": prompt})
-        chat_history.append({"role": "assistant", "content": ans, "sources": srcs})
+        chat_history.append({"role": "assistant", "content": ans,
+                              "sources": srcs, "summaries": sums})
 
 
 # ════════════════════════════════════════════════════════════════════
