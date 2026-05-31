@@ -827,11 +827,18 @@ def _chat_process(prompt: str):
 
     # ONE structured Gemini call — returns per-source summaries + full answer
     structured_prompt = (
-        "You are a placement prep coach. Based on the search results, respond EXACTLY in this format:\n\n"
-        "WEB: [2-3 sentences summarising what interview forums and blogs say about this topic]\n"
-        "GLASSDOOR: [2-3 sentences summarising company ratings, culture, and interview difficulty]\n"
-        "JOBS: [2-3 sentences summarising required skills, salary, and job requirements]\n"
-        "ANSWER: [a clear, helpful 4-6 sentence answer to the student's question]\n\n"
+        "You are a sharp, professional placement-prep coach. Be concise and scannable.\n"
+        "Use the search results below. Respond EXACTLY in this format:\n\n"
+        "WEB: [max 2 short sentences — key facts only, no filler]\n"
+        "GLASSDOOR: [max 2 short sentences — rating, difficulty, culture]\n"
+        "JOBS: [max 2 short sentences — required skills, CTC if known]\n"
+        "ANSWER:\n"
+        "[Answer the question like Claude would — direct and well-structured:\n"
+        " - Open with ONE bold takeaway line.\n"
+        " - Then 3-5 markdown bullet points (use '- ' and **bold** for key terms).\n"
+        " - Keep total under 120 words unless the question explicitly asks for depth.\n"
+        " - No preamble like 'Based on the results'. Just answer.\n"
+        " - If listing rounds/steps, use a numbered list.]\n\n"
         f"Search results:\n{context[:3000]}\n\n"
         f"Student question: {prompt}"
     )
