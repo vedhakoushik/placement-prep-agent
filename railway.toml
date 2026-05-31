@@ -11,7 +11,5 @@ dockerfilePath = "Dockerfile"   # explicit path
 
 [deploy]
 startCommand = "streamlit run week5/day34_35_app.py --server.port=$PORT --server.address=0.0.0.0 --server.headless=true"
-healthcheckPath = "/_stcore/health"
-healthcheckTimeout = 30         # seconds to wait for health check
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
