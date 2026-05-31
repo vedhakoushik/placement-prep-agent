@@ -389,6 +389,62 @@ div[data-testid="stHorizontalBlock"] .stButton > button[kind="secondary"]:hover 
 .api-ok   { color: var(--green);  font-size: 12px; font-weight: 500; }
 .api-miss { color: var(--orange); font-size: 12px; font-weight: 500; }
 .ai-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); display: inline-block; margin-right: 5px; }
+
+/* ══════════════════════════════════════════════════════════════
+   MOBILE — anything ≤ 640px wide
+   ══════════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+
+  /* Tighter page gutters */
+  .block-container {
+    padding: 14px 12px 90px !important;
+    max-width: 100% !important;
+  }
+
+  /* Stack ALL horizontal column blocks vertically
+     (source panels, chip rows, suggestion cards, metrics) */
+  [data-testid="stHorizontalBlock"] {
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+  [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+    width: 100% !important;
+    flex: 1 1 100% !important;
+    min-width: 100% !important;
+  }
+
+  /* Smaller chat hero */
+  .chat-hero { padding: 28px 8px 22px !important; }
+  .chat-greeting { font-size: 30px !important; margin-bottom: 8px !important; }
+  .chat-sub { font-size: 15px !important; }
+
+  /* Suggestion cards: shorter on mobile (they stack now) */
+  .stButton > button[kind="primary"] {
+    min-height: auto !important;
+    padding: 14px 14px !important;
+  }
+
+  /* Headings */
+  h1 { font-size: 19px !important; }
+  h2 { font-size: 16px !important; }
+
+  /* Forms: less inner padding */
+  [data-testid="stForm"] { padding: 16px !important; }
+
+  /* Chat input sits above mobile browser chrome */
+  [data-testid="stChatInput"] textarea { font-size: 16px !important; }  /* 16px stops iOS zoom-on-focus */
+
+  /* Breadcrumb spacing */
+  .breadcrumb { padding-bottom: 10px; margin-bottom: 10px; }
+
+  /* Dataframe horizontal scroll instead of squish */
+  [data-testid="stDataFrame"] { overflow-x: auto !important; }
+}
+
+/* Tablet — 641px to 920px: 2-col source panels instead of 3 */
+@media (min-width: 641px) and (max-width: 920px) {
+  .chat-greeting { font-size: 38px !important; }
+}
 </style>
 """
 
