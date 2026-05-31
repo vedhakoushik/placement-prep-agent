@@ -107,6 +107,19 @@ CSS = """
 [data-testid="stSidebar"] { background:#1c1b1b !important; border-right:1px solid var(--border) !important; }
 [data-testid="stSidebar"] > div:first-child { padding-top:0 !important; }
 [data-testid="stSidebar"] hr { border-color:var(--border) !important; margin:10px 0 !important; }
+
+/* Sidebar collapse/expand toggle — always visible (not just on hover) */
+[data-testid="stSidebarCollapseButton"],
+[data-testid="stSidebarCollapsedControl"],
+[data-testid="collapsedControl"],
+[data-testid="stSidebarCollapseButton"] button {
+  opacity:1 !important; visibility:visible !important;
+}
+[data-testid="stSidebarCollapseButton"] button,
+[data-testid="stSidebarCollapsedControl"] button {
+  color:var(--gold) !important; background:var(--surface-high) !important;
+  border:1px solid var(--border) !important; border-radius:8px !important;
+}
 /* Flat nav rows — reset ALL card/border leakage from global button rules */
 [data-testid="stSidebar"] .stButton > button,
 [data-testid="stSidebar"] .stButton > button[kind="primary"],
