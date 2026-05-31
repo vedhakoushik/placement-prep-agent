@@ -79,8 +79,28 @@ CSS = """
 
 /* ── Shell ── */
 .stApp { background: #fff; }
-.stApp > header { background: #fff !important; border-bottom: 1px solid var(--border); }
-.block-container { padding-top: 28px !important; max-width: 920px; }
+
+/* Top header bar — kill the dark band */
+.stApp > header,
+[data-testid="stHeader"] {
+  background: #fff !important;
+  border-bottom: 1px solid var(--border) !important;
+  height: 0 !important;        /* collapse the empty toolbar strip */
+}
+[data-testid="stToolbar"] { right: 8px !important; }
+
+/* Bottom chat container — kill the dark band behind the input */
+[data-testid="stBottom"],
+[data-testid="stBottom"] > div,
+[data-testid="stBottomBlockContainer"] {
+  background: #fff !important;
+}
+[data-testid="stBottomBlockContainer"] {
+  padding-top: 8px !important;
+  padding-bottom: 12px !important;
+}
+
+.block-container { padding-top: 40px !important; max-width: 920px; }
 
 /* ── Sidebar ── */
 [data-testid="stSidebar"] {
