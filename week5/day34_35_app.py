@@ -207,6 +207,23 @@ hr { border:none !important; border-top:1px solid var(--border) !important; marg
 .breadcrumb { font-size:13px; color:var(--text-lo); padding-bottom:16px; margin-bottom:16px; border-bottom:1px solid var(--border); }
 .breadcrumb strong { color:var(--text-hi); font-weight:600; }
 .nav-lbl { font-size:10.5px; font-weight:700; color:var(--text-lo); text-transform:uppercase; letter-spacing:.08em; padding:18px 0 4px; display:block; }
+
+/* Bottom user chip */
+[data-testid="stSidebar"] > div:first-child { display:flex !important; flex-direction:column !important; }
+.user-chip {
+  margin-top:auto; display:flex; align-items:center; gap:11px;
+  padding:12px 14px; border-top:1px solid var(--border);
+}
+.user-avatar {
+  width:34px; height:34px; border-radius:9px; flex-shrink:0;
+  background:var(--gold); color:var(--on-gold);
+  display:flex; align-items:center; justify-content:center;
+  font-size:14px; font-weight:700;
+}
+.user-meta { line-height:1.3; overflow:hidden; }
+.user-name { font-size:13px; font-weight:600; color:var(--text-hi); white-space:nowrap; text-overflow:ellipsis; overflow:hidden; }
+.user-status { font-size:11px; color:var(--text-lo); display:flex; align-items:center; gap:5px; }
+.user-dot { width:6px; height:6px; border-radius:50%; display:inline-block; }
 .chip-row { display:flex; gap:7px; flex-wrap:wrap; margin:10px 0 6px; }
 .chip { padding:5px 13px; border:1px solid var(--border); border-radius:20px; font-size:12px; color:var(--text-mid); background:var(--surface-low); line-height:1.4; }
 div[data-testid="stHorizontalBlock"] .stButton > button[kind="secondary"] { border-radius:20px !important; font-size:12px !important; font-weight:500 !important; padding:6px 13px !important; height:auto !important; line-height:1.4 !important; color:var(--text-mid) !important; border-color:var(--border) !important; }
@@ -1275,11 +1292,11 @@ def page_settings():
 #  NAVIGATION
 # ════════════════════════════════════════════════════════════════════
 NAV_SECTIONS = {
-    "PREPARE": [("💬  Chat",         page_chat),
-                ("❓  Questions",    page_questions)],
-    "MANAGE":  [("🏢  My Companies", page_companies)],
-    "MORE":    [("📊  Progress",     page_progress),
-                ("⚙️  Settings",     page_settings)],
+    "PREPARE": [("Chat",         page_chat),
+                ("Questions",    page_questions)],
+    "MANAGE":  [("My Companies", page_companies)],
+    "MORE":    [("Progress",     page_progress),
+                ("Settings",     page_settings)],
 }
 
 
@@ -1294,7 +1311,7 @@ def main():
 
     # ── Default page ──────────────────────────────────────────────
     if "nav_page" not in st.session_state:
-        st.session_state.nav_page = "💬  Chat"
+        st.session_state.nav_page = "Chat"
 
     # ── Sidebar logo ──────────────────────────────────────────────
     st.sidebar.markdown(
@@ -1329,47 +1346,26 @@ def main():
                 st.session_state.nav_page = label
                 st.rerun()
 
-    st.sidebar.divider()
+    # ── Bottom user chip (fixed to sidebar bottom) ────────────────
+    cfg     = get_cfg()
+    name    = (cfg.get("name") or "Guest").strip()
+    initial = name[0].upper() if name else "G"
+    gem_ok  = bool(os.getenv("GEMINI_API_KEY"))
+    tav_ok  = bool(os.getenv("TAVILY_API_KEY"))
+    online  = gem_ok and tav_ok
+    status_dot = "#86efac" if online else "#fca5a5"
+    status_txt = "AI Ready" if online else "Keys missing"
 
-    # ── Context chip (after research) ─────────────────────────────
-    if "research_results" in st.session_state:
-        r = st.session_state.research_results
-        st.sidebar.markdown(
-            f'<div style="padding:2px 2px 5px">'
-            f'<span class="context-chip">📌 {r.get("company","?")} · {r.get("focus","?")}</span>'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
-
-    log = st.session_state.get("progress_log", [])
-    if log:
-        total_q = sum(e.get("questions", 0) for e in log)
-        st.sidebar.markdown(
-            f'<div style="font-size:11px;color:#aaa;padding:2px 2px 4px">'
-            f'{len(log)} session{"s" if len(log)>1 else ""} · {total_q} questions</div>',
-            unsafe_allow_html=True,
-        )
-
-    # ── AI status + week tag (bottom) ─────────────────────────────
-    gem_ok = bool(os.getenv("GEMINI_API_KEY"))
-    tav_ok = bool(os.getenv("TAVILY_API_KEY"))
-    if gem_ok and tav_ok:
-        st.sidebar.markdown(
-            '<div style="margin-top:12px">'
-            '<span style="font-size:12px;color:#16a34a;font-weight:600">'
-            '<span class="ai-dot"></span>AI Ready</span>'
-            '<div style="font-size:11px;color:#aaa;margin-top:3px">3 sources · parallel search</div>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-    else:
-        missing = [n for n, ok in [("Gemini", gem_ok), ("Tavily", tav_ok)] if not ok]
-        st.sidebar.markdown(
-            f'<div style="margin-top:12px;font-size:12px;color:#ea580c;font-weight:500">'
-            f'⚠ {", ".join(missing)} key missing</div>'
-            f'<div style="font-size:11px;color:#aaa;margin-top:2px">Check ⚙️ Settings</div>',
-            unsafe_allow_html=True,
-        )
+    st.sidebar.markdown(
+        f'<div class="user-chip">'
+        f'  <div class="user-avatar">{initial}</div>'
+        f'  <div class="user-meta">'
+        f'    <div class="user-name">{name}</div>'
+        f'    <div class="user-status"><span class="user-dot" style="background:{status_dot}"></span>{status_txt}</div>'
+        f'  </div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
 
     # ── Render active page ────────────────────────────────────────
     all_page_fns[st.session_state.nav_page]()
