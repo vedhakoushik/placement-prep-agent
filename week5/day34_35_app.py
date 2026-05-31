@@ -69,12 +69,12 @@ CSS = """
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
 
 :root {
-  --bg:#131313; --surface-low:#1c1b1b; --surface:#201f1f; --surface-lowest:#0e0e0e;
-  --surface-high:#2a2a2a; --surface-highest:#353534;
-  --border:#4d4732; --border-hov:#999077;
-  --text-hi:#e5e2e1; --text-mid:#d0c6ab; --text-lo:#999077; --text-lbl:#999077;
-  --gold:#ffd700; --gold-soft:#ffe16d; --on-gold:#3a3000;
-  --shadow:0 4px 20px rgba(0,0,0,.4); --glow:0 0 30px rgba(255,215,0,.10);
+  --bg:#0d100a; --surface-low:#141811; --surface:#181c14; --surface-lowest:#0a0d07;
+  --surface-high:#232a1c; --surface-highest:#2c3424;
+  --border:#2f3a23; --border-hov:#6b7a4d;
+  --text-hi:#eef2e6; --text-mid:#c2cbb0; --text-lo:#8a936f; --text-lbl:#8a936f;
+  --gold:#c5f82a; --gold-soft:#d6ff5c; --on-gold:#15200a;
+  --shadow:0 4px 20px rgba(0,0,0,.45); --glow:0 0 30px rgba(197,248,42,.12);
   --green:#86efac; --green-bg:#14271a; --green-bd:#2f5236;
   --orange:#fdba74; --orange-bg:#2a1c10; --orange-bd:#5a3d1f;
   --red:#fca5a5; --red-bg:#2a1414; --red-bd:#5a2f2f;
@@ -84,9 +84,9 @@ CSS = """
 
 .stApp {
   background:
-    radial-gradient(circle at 50% 0%, rgba(255,215,0,.04) 0%, transparent 45%),
-    radial-gradient(circle at 90% 90%, rgba(255,215,0,.03) 0%, transparent 35%),
-    #131313;
+    radial-gradient(circle at 50% 0%, rgba(197,248,42,.04) 0%, transparent 45%),
+    radial-gradient(circle at 90% 90%, rgba(197,248,42,.03) 0%, transparent 35%),
+    #0d100a;
 }
 .stApp > header, [data-testid="stHeader"] { background:transparent !important; height:0 !important; border:none !important; }
 [data-testid="stToolbar"] { right:8px !important; }
@@ -113,9 +113,9 @@ CSS = """
   background:var(--gold) !important; color:var(--on-gold) !important; border:none !important; border-radius:10px !important;
   font-size:13px !important; font-weight:700 !important; padding:9px 22px !important; box-shadow:none !important; transition:all .18s !important;
 }
-.stButton > button:hover { background:var(--gold-soft) !important; transform:translateY(-1px) !important; box-shadow:0 6px 20px rgba(255,215,0,.25) !important; }
+.stButton > button:hover { background:var(--gold-soft) !important; transform:translateY(-1px) !important; box-shadow:0 6px 20px rgba(197,248,42,.25) !important; }
 .stButton > button[kind="secondary"] { background:transparent !important; color:var(--text-mid) !important; border:1px solid var(--border) !important; }
-.stButton > button[kind="secondary"]:hover { border-color:var(--gold) !important; color:var(--gold-soft) !important; background:rgba(255,215,0,.05) !important; transform:none !important; box-shadow:none !important; }
+.stButton > button[kind="secondary"]:hover { border-color:var(--gold) !important; color:var(--gold-soft) !important; background:rgba(197,248,42,.05) !important; transform:none !important; box-shadow:none !important; }
 
 .stButton > button[kind="primary"] {
   background:linear-gradient(160deg,var(--surface) 0%,var(--surface-lowest) 100%) !important; color:var(--text-mid) !important;
@@ -125,7 +125,7 @@ CSS = """
   font-size:13px !important; font-weight:500 !important; line-height:1.55 !important; box-shadow:none !important; transform:none !important;
 }
 .stButton > button[kind="primary"]:hover {
-  border-color:rgba(255,215,0,.4) !important; color:var(--text-hi) !important;
+  border-color:rgba(197,248,42,.4) !important; color:var(--text-hi) !important;
   box-shadow:var(--glow) !important; transform:translateY(-3px) !important;
   background:linear-gradient(160deg,var(--surface-high) 0%,var(--surface-lowest) 100%) !important;
 }
@@ -133,16 +133,16 @@ CSS = """
 [data-testid="stFormSubmitButton"] button {
   background:var(--gold) !important; color:var(--on-gold) !important; border:none !important; border-radius:999px !important;
   font-size:13px !important; font-weight:700 !important; padding:11px 28px !important; width:100% !important;
-  box-shadow:0 2px 12px rgba(255,215,0,.25) !important; transition:all .18s !important;
+  box-shadow:0 2px 12px rgba(197,248,42,.25) !important; transition:all .18s !important;
 }
-[data-testid="stFormSubmitButton"] button:hover { background:var(--gold-soft) !important; box-shadow:0 6px 22px rgba(255,215,0,.4) !important; transform:translateY(-1px) !important; }
+[data-testid="stFormSubmitButton"] button:hover { background:var(--gold-soft) !important; box-shadow:0 6px 22px rgba(197,248,42,.4) !important; transform:translateY(-1px) !important; }
 
 .stTextInput input, .stTextArea textarea, div[data-baseweb="input"] input, div[data-baseweb="textarea"] textarea {
   border:1px solid var(--border) !important; border-radius:10px !important; color:var(--text-hi) !important; font-size:13px !important;
   background:var(--surface-low) !important; -webkit-text-fill-color:var(--text-hi) !important; transition:border-color .2s,box-shadow .2s !important;
 }
 div[data-baseweb="input"], div[data-baseweb="textarea"] { background:var(--surface-low) !important; border-radius:10px !important; }
-.stTextInput input:focus, .stTextArea textarea:focus { border-color:var(--gold) !important; box-shadow:0 0 0 2px rgba(255,215,0,.15) !important; }
+.stTextInput input:focus, .stTextArea textarea:focus { border-color:var(--gold) !important; box-shadow:0 0 0 2px rgba(197,248,42,.15) !important; }
 .stTextInput input::placeholder, .stTextArea textarea::placeholder { color:var(--text-lo) !important; opacity:1 !important; }
 .stTextInput label, .stTextArea label, .stSelectbox label, .stNumberInput label { font-size:10px !important; font-weight:700 !important; color:var(--text-lo) !important; text-transform:uppercase !important; letter-spacing:.08em !important; }
 
@@ -161,7 +161,7 @@ div[data-baseweb="popover"] li { background:var(--surface) !important; color:var
 [data-testid="stMetricLabel"] { color:var(--text-lo) !important; font-size:11px !important; text-transform:uppercase; letter-spacing:.05em; }
 
 .stExpander { border:1px solid var(--border) !important; border-radius:12px !important; background:var(--surface-low) !important; margin-bottom:6px !important; }
-.stExpander:hover { border-color:rgba(255,215,0,.3) !important; }
+.stExpander:hover { border-color:rgba(197,248,42,.3) !important; }
 .stExpander details summary { font-size:13px !important; color:var(--text-hi) !important; padding:11px 15px !important; }
 .stExpander p, .stExpander li { color:var(--text-mid) !important; }
 
@@ -171,7 +171,7 @@ div[data-baseweb="popover"] li { background:var(--surface) !important; color:var
 .chat-hero { text-align:center; padding:54px 20px 40px; }
 .chat-greeting {
   font-size:46px; font-weight:800; letter-spacing:-.03em; line-height:1.1; margin-bottom:12px;
-  background:linear-gradient(90deg,#e5e2e1 0%,#ffe16d 50%,#e5e2e1 100%); background-size:200% auto;
+  background:linear-gradient(90deg,#eef2e6 0%,#d6ff5c 50%,#eef2e6 100%); background-size:200% auto;
   -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
 }
 .hello-hi { color:transparent; } .hello-name { color:transparent; }
@@ -200,7 +200,7 @@ hr { border:none !important; border-top:1px solid var(--border) !important; marg
 .chip-row { display:flex; gap:7px; flex-wrap:wrap; margin:10px 0 6px; }
 .chip { padding:5px 13px; border:1px solid var(--border); border-radius:20px; font-size:12px; color:var(--text-mid); background:var(--surface-low); line-height:1.4; }
 div[data-testid="stHorizontalBlock"] .stButton > button[kind="secondary"] { border-radius:20px !important; font-size:12px !important; font-weight:500 !important; padding:6px 13px !important; height:auto !important; line-height:1.4 !important; color:var(--text-mid) !important; border-color:var(--border) !important; }
-.context-chip { display:inline-flex; align-items:center; gap:6px; background:rgba(255,215,0,.12); border:1px solid rgba(255,215,0,.3); border-radius:20px; font-size:12px; color:var(--gold-soft); padding:4px 12px; font-weight:600; }
+.context-chip { display:inline-flex; align-items:center; gap:6px; background:rgba(197,248,42,.12); border:1px solid rgba(197,248,42,.3); border-radius:20px; font-size:12px; color:var(--gold-soft); padding:4px 12px; font-weight:600; }
 .badge-easy { font-size:10px; font-weight:700; padding:2px 8px; border-radius:10px; background:var(--green-bg); color:var(--green); border:1px solid var(--green-bd); }
 .badge-medium { font-size:10px; font-weight:700; padding:2px 8px; border-radius:10px; background:var(--orange-bg); color:var(--orange); border:1px solid var(--orange-bd); }
 .badge-hard { font-size:10px; font-weight:700; padding:2px 8px; border-radius:10px; background:var(--red-bg); color:var(--red); border:1px solid var(--red-bd); }
@@ -903,7 +903,7 @@ def _render_sources_columns(summaries: dict):
     # icon, title, header-bg, accent, border  (dark theme tints)
     panels = [
         ("🔍", "Web Search",  "rgba(147,197,253,.10)", "#93c5fd", "#2f4373", summaries.get("general",   "")),
-        ("⭐", "Glassdoor",   "rgba(255,215,0,.10)",   "#ffe16d", "#4d4732", summaries.get("glassdoor", "")),
+        ("⭐", "Glassdoor",   "rgba(197,248,42,.10)",   "#ffe16d", "#4d4732", summaries.get("glassdoor", "")),
         ("💼", "Job Portals", "rgba(134,239,172,.10)", "#86efac", "#2f5236", summaries.get("jobs",      "")),
     ]
 
@@ -1289,15 +1289,15 @@ def main():
     # ── Sidebar logo ──────────────────────────────────────────────
     st.sidebar.markdown(
         '<div style="display:flex;align-items:center;gap:10px;padding:22px 16px 16px">'
-        '<div style="width:34px;height:34px;border-radius:9px;background:#ffd700;'
+        '<div style="width:34px;height:34px;border-radius:9px;background:#c5f82a;'
         'display:flex;align-items:center;justify-content:center;flex-shrink:0;'
-        'box-shadow:0 0 16px rgba(255,215,0,.3)">'
+        'box-shadow:0 0 16px rgba(197,248,42,.35)">'
         '<svg width="18" height="18" viewBox="0 0 20 20" fill="none">'
-        '<circle cx="10" cy="10" r="8" stroke="#3a3000" stroke-width="1.6"/>'
-        '<path d="M10 4.5L14.5 10L10 15.5L5.5 10Z" fill="#3a3000" opacity="0.9"/>'
-        '<circle cx="10" cy="10" r="2.2" fill="#fff6df"/>'
+        '<circle cx="10" cy="10" r="8" stroke="#15200a" stroke-width="1.6"/>'
+        '<path d="M10 4.5L14.5 10L10 15.5L5.5 10Z" fill="#15200a" opacity="0.9"/>'
+        '<circle cx="10" cy="10" r="2.2" fill="#eaffc0"/>'
         '</svg></div>'
-        '<span style="font-size:15px;font-weight:700;color:#e5e2e1;letter-spacing:-.02em">'
+        '<span style="font-size:15px;font-weight:700;color:#eef2e6;letter-spacing:-.02em">'
         'Placement Prep</span></div>',
         unsafe_allow_html=True,
     )
