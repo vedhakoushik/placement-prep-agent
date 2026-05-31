@@ -107,16 +107,29 @@ CSS = """
 [data-testid="stSidebar"] { background:#1c1b1b !important; border-right:1px solid var(--border) !important; }
 [data-testid="stSidebar"] > div:first-child { padding-top:0 !important; }
 [data-testid="stSidebar"] hr { border-color:var(--border) !important; margin:10px 0 !important; }
-[data-testid="stSidebar"] .stButton > button {
-  background:transparent !important; border:none !important; border-radius:10px !important;
-  text-align:left !important; justify-content:flex-start !important;
-  padding:9px 14px !important; margin:1px 0 !important;
-  font-size:13px !important; font-weight:500 !important; color:var(--text-mid) !important;
-  height:40px !important; line-height:1.2 !important; box-shadow:none !important;
-  transform:none !important; transition:background .15s,color .15s !important; width:100% !important;
+/* Flat nav rows — reset ALL card/border leakage from global button rules */
+[data-testid="stSidebar"] .stButton > button,
+[data-testid="stSidebar"] .stButton > button[kind="primary"],
+[data-testid="stSidebar"] .stButton > button[kind="secondary"] {
+  background:transparent !important; border:none !important; border-radius:8px !important;
+  min-height:0 !important; height:38px !important;
+  text-align:left !important; justify-content:flex-start !important; white-space:normal !important;
+  padding:8px 12px !important; margin:1px 0 !important;
+  font-size:13.5px !important; font-weight:500 !important; color:var(--text-mid) !important;
+  line-height:1.2 !important; box-shadow:none !important; transform:none !important;
+  transition:background .15s,color .15s !important; width:100% !important;
 }
-[data-testid="stSidebar"] .stButton > button:hover { background:var(--surface-high) !important; color:var(--gold-soft) !important; transform:none !important; box-shadow:none !important; }
-[data-testid="stSidebar"] .stButton > button[kind="primary"] { background:var(--surface-high) !important; color:var(--gold) !important; font-weight:600 !important; }
+[data-testid="stSidebar"] .stButton > button:hover {
+  background:var(--surface-high) !important; color:var(--text-hi) !important;
+  border:none !important; transform:none !important; box-shadow:none !important;
+}
+/* Active row — subtle filled, no box */
+[data-testid="stSidebar"] .stButton > button[kind="primary"] {
+  background:rgba(197,248,42,.10) !important; color:var(--gold) !important; font-weight:600 !important;
+}
+[data-testid="stSidebar"] .stButton > button[kind="primary"]:hover {
+  background:rgba(197,248,42,.16) !important; color:var(--gold-soft) !important;
+}
 [data-testid="stSidebar"] .stCaption p { color:var(--text-lo) !important; font-size:11px !important; }
 
 .stButton > button {
