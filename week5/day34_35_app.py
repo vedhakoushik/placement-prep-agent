@@ -1352,7 +1352,7 @@ def main():
         page_title="Placement Prep",
         page_icon="🎯",
         layout="wide",
-        initial_sidebar_state="expanded",
+        initial_sidebar_state="auto",   # auto-collapses on mobile, open on desktop
     )
     st.markdown(CSS, unsafe_allow_html=True)
 
