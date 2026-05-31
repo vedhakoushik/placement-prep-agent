@@ -2,6 +2,8 @@
 
 > AI-powered interview prep — research any company, generate tailored questions, and chat with your own research context.
 
+**🚀 [Live Demo →](https://placement-prep-agent-production.up.railway.app)** &nbsp;|&nbsp; [![CI](https://github.com/vedhakoushik/placement-prep-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/vedhakoushik/placement-prep-agent/actions/workflows/ci.yml)
+
 Built over 8 weeks as a **learning capstone**: each week adds one production layer — from raw API calls to a fully deployed, monitored web app.
 
 ---
