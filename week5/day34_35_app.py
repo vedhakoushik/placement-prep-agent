@@ -1275,8 +1275,8 @@ def page_settings():
 #  NAVIGATION
 # ════════════════════════════════════════════════════════════════════
 NAV_SECTIONS = {
-    "PREPARE": [("❓  Questions",    page_questions),
-                ("💬  Chat",         page_chat)],
+    "PREPARE": [("💬  Chat",         page_chat),
+                ("❓  Questions",    page_questions)],
     "MANAGE":  [("🏢  My Companies", page_companies)],
     "MORE":    [("📊  Progress",     page_progress),
                 ("⚙️  Settings",     page_settings)],
@@ -1294,7 +1294,7 @@ def main():
 
     # ── Default page ──────────────────────────────────────────────
     if "nav_page" not in st.session_state:
-        st.session_state.nav_page = "❓  Questions"
+        st.session_state.nav_page = "💬  Chat"
 
     # ── Sidebar logo ──────────────────────────────────────────────
     st.sidebar.markdown(
