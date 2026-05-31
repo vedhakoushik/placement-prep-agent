@@ -812,16 +812,13 @@ def _render_research_chat(msg: dict):
         st.markdown(msg["synthesis"])
 
 
-def _chat_process(prompt: str):
+def _chat_process(prompt: str, history: list | None = None):
     """
     Core handler for every chat message.
 
-    Searches all 3 sources with the EXACT question as the query —
-    no fragile company-name extraction. Tavily finds what's relevant,
-    Gemini synthesises using those real results.
-
-    Sources used: Web (general) + Glassdoor + Job portals.
-    All 3 run in parallel via ThreadPoolExecutor.
+    Searches all 3 sources with focused queries, then Gemini synthesises.
+    `history` = prior turns (list of {role, content}) for conversation
+    continuity — the model sees what was already discussed.
     """
     def _safe(future):
         try:
@@ -865,12 +862,24 @@ def _chat_process(prompt: str):
         ctx_parts.append("JOB PORTALS:\n" + "\n".join(sources["jobs"][:2]))
     context = "\n\n".join(ctx_parts)
 
+    # Recent conversation context (last 4 turns) for continuity
+    convo = ""
+    if history:
+        recent = history[-4:]
+        convo = "Conversation so far:\n" + "\n".join(
+            f"{'Student' if m['role']=='user' else 'Coach'}: {m['content'][:300]}"
+            for m in recent
+        ) + "\n\n"
+
     # ONE structured Gemini call — returns per-source summaries + full answer
     structured_prompt = (
         "You are a sharp, professional placement-prep coach. Be concise and scannable.\n"
         "CRITICAL: Answer the EXACT question asked. Do NOT give a generic company overview.\n"
+        "Use the conversation so far for context (e.g. follow-up questions like "
+        "'what about the salary?' refer to the company already discussed).\n"
         "If the search results don't cover the question, say so briefly and answer from "
         "your own knowledge — never pad with unrelated facts.\n\n"
+        + convo +
         "Respond EXACTLY in this format:\n\n"
         "WEB: [max 2 sentences — only facts relevant to THE QUESTION]\n"
         "GLASSDOOR: [max 2 sentences — rating, interview difficulty, culture]\n"
@@ -1065,53 +1074,46 @@ def page_chat():
                              type="primary"):
                     triggered = card_prompt
 
+        # Card click → add user message, then rerun to process it
         if triggered:
-            with st.spinner("🔍 Searching 3 sources…"):
-                ans, srcs, sums = _chat_process(triggered)
-            chat_history.append({"role": "user",      "content": triggered})
-            chat_history.append({"role": "assistant", "content": ans,
-                                  "sources": srcs, "summaries": sums})
+            chat_history.append({"role": "user", "content": triggered})
             st.rerun()
 
     # ══════════════════════════════════════════════════════════════
-    #  CHAT STATE — render conversation
-    #  Structure per exchange:
-    #    [User bubble]
-    #    [3-column: Web | Glassdoor | Jobs]   ← outside bubble, full width
-    #    [Assistant bubble with AI answer]
+    #  CHAT STATE — render the full conversation from history
+    #  (single source of truth — every turn persists)
     # ══════════════════════════════════════════════════════════════
     else:
         for msg in chat_history:
-            if msg["role"] == "user":
-                with st.chat_message("user"):
-                    st.markdown(msg["content"])
-            else:
-                # Answer first (the main reply), sources collapsed below
-                with st.chat_message("assistant"):
-                    st.markdown(msg["content"])
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+                if msg["role"] == "assistant":
                     sums = msg.get("summaries", {})
                     if sums and any(sums.values()):
                         _render_sources_columns(sums)
 
     # ══════════════════════════════════════════════════════════════
-    #  Chat input — always visible
+    #  Pending answer — last message is an unanswered user message
     # ══════════════════════════════════════════════════════════════
-    if prompt := st.chat_input("Ask anything — mention a company to get real-time research…"):
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        with st.spinner("🔍 Searching Web · Glassdoor · Job Portals…"):
-            ans, srcs, sums = _chat_process(prompt)
-
-        # Answer first, sources collapsed below
+    if chat_history and chat_history[-1]["role"] == "user":
         with st.chat_message("assistant"):
+            with st.spinner("🔍 Searching Web · Glassdoor · Job Portals…"):
+                ans, srcs, sums = _chat_process(
+                    chat_history[-1]["content"], history=chat_history[:-1]
+                )
             st.markdown(ans)
             if sums and any(sums.values()):
                 _render_sources_columns(sums)
-
-        chat_history.append({"role": "user",      "content": prompt})
         chat_history.append({"role": "assistant", "content": ans,
                               "sources": srcs, "summaries": sums})
+        st.rerun()
+
+    # ══════════════════════════════════════════════════════════════
+    #  Chat input — always visible
+    # ══════════════════════════════════════════════════════════════
+    if prompt := st.chat_input("Ask anything — mention a company to get real-time research…"):
+        chat_history.append({"role": "user", "content": prompt})
+        st.rerun()
 
 
 # ════════════════════════════════════════════════════════════════════
