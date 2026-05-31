@@ -69,12 +69,12 @@ CSS = """
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
 
 :root {
-  --bg:#0d100a; --surface-low:#141811; --surface:#181c14; --surface-lowest:#0a0d07;
-  --surface-high:#232a1c; --surface-highest:#2c3424;
-  --border:#2f3a23; --border-hov:#6b7a4d;
-  --text-hi:#eef2e6; --text-mid:#c2cbb0; --text-lo:#8a936f; --text-lbl:#8a936f;
-  --gold:#c5f82a; --gold-soft:#d6ff5c; --on-gold:#15200a;
-  --shadow:0 4px 20px rgba(0,0,0,.45); --glow:0 0 30px rgba(197,248,42,.12);
+  --bg:#15190f; --surface-low:#1d2216; --surface:#222719; --surface-lowest:#10130b;
+  --surface-high:#2d3422; --surface-highest:#3a432c;
+  --border:#3c4a2b; --border-hov:#7e8f57;
+  --text-hi:#f3f6ec; --text-mid:#cfd8bd; --text-lo:#9aa67a; --text-lbl:#9aa67a;
+  --gold:#c5f82a; --gold-soft:#d6ff5c; --on-gold:#101806;
+  --shadow:0 4px 20px rgba(0,0,0,.4); --glow:0 0 26px rgba(197,248,42,.14);
   --green:#86efac; --green-bg:#14271a; --green-bd:#2f5236;
   --orange:#fdba74; --orange-bg:#2a1c10; --orange-bd:#5a3d1f;
   --red:#fca5a5; --red-bg:#2a1414; --red-bd:#5a2f2f;
@@ -85,6 +85,11 @@ CSS = """
 [class*="material-symbols"], [class*="material-icons"], span[data-testid*="Icon"] i,
 [data-testid="stIconMaterial"], .material-symbols-outlined, .material-symbols-rounded {
   font-family:'Material Symbols Outlined','Material Symbols Rounded','Material Icons' !important;
+}
+/* Button labels inherit the button colour (global p rule was hiding them) */
+.stButton > button p, .stButton > button div, .stButton > button span,
+[data-testid="stFormSubmitButton"] button p, [data-testid="stFormSubmitButton"] button div {
+  color:inherit !important; -webkit-text-fill-color:inherit !important;
 }
 
 .stApp {
