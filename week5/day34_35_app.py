@@ -929,35 +929,33 @@ def _clean_snippet(text: str) -> str:
 
 def _render_sources_columns(summaries: dict):
     """
-    Render Web / Glassdoor / Job Portals synthesised summaries in 3
-    side-by-side coloured panels. Each cell shows a clean 2-3 sentence
-    AI summary of that source — not raw snippets.
-    summaries keys: 'general', 'glassdoor', 'jobs'  (string values)
+    Render the 3 source summaries inside one collapsible 'Sources' block —
+    clean line-separated sections, no boxes. The main answer stays the
+    focus (Claude-style); sources are supporting evidence below it.
     """
-    # icon, title, header-bg, accent, border  (dark theme tints)
-    panels = [
-        ("🔍", "Web Search",  "rgba(147,197,253,.10)", "#93c5fd", "#2f4373", summaries.get("general",   "")),
-        ("⭐", "Glassdoor",   "rgba(197,248,42,.10)",   "#ffe16d", "#4d4732", summaries.get("glassdoor", "")),
-        ("💼", "Job Portals", "rgba(134,239,172,.10)", "#86efac", "#2f5236", summaries.get("jobs",      "")),
+    sections = [
+        ("🔍", "Web",       "#93c5fd", summaries.get("general",   "")),
+        ("⭐", "Glassdoor", "#d6ff5c", summaries.get("glassdoor", "")),
+        ("💼", "Jobs",      "#86efac", summaries.get("jobs",      "")),
     ]
+    if not any(t for _, _, _, t in sections):
+        return
 
-    c1, c2, c3 = st.columns(3, gap="small")
-    for col, (ic, title, bg, color, border, text) in zip([c1, c2, c3], panels):
-        with col:
-            body = (
-                f'<p style="font-size:13.5px;color:#e5e2e1;line-height:1.65;margin:0">{text}</p>'
-                if text else
-                '<p style="font-size:13px;color:#999077;margin:0">No data found for this query.</p>'
-            )
-            st.markdown(
-                f'<div style="border:1px solid {border};border-radius:12px;overflow:hidden">'
-                f'<div style="background:{bg};padding:11px 16px;font-size:14px;'
-                f'font-weight:700;color:{color};border-bottom:1px solid {border}">'
-                f'{ic}&nbsp; {title}</div>'
-                f'<div style="padding:14px 16px;background:#1c1b1b;min-height:80px">'
-                f'{body}</div></div>',
-                unsafe_allow_html=True,
-            )
+    rows = ""
+    for i, (ic, title, color, text) in enumerate(sections):
+        if not text:
+            continue
+        divider = "border-top:1px solid var(--border);" if i and rows else ""
+        rows += (
+            f'<div style="padding:12px 0;{divider}">'
+            f'<div style="font-size:12px;font-weight:700;color:{color};'
+            f'letter-spacing:.02em;margin-bottom:5px">{ic} {title}</div>'
+            f'<div style="font-size:13.5px;color:var(--text-mid);line-height:1.6">{text}</div>'
+            f'</div>'
+        )
+
+    with st.expander("Sources  ·  Web · Glassdoor · Jobs", expanded=True):
+        st.markdown(rows, unsafe_allow_html=True)
 
 
 def page_chat():
@@ -1045,13 +1043,12 @@ def page_chat():
                 with st.chat_message("user"):
                     st.markdown(msg["content"])
             else:
-                # 3-column summaries panel (full width, outside chat bubble)
-                sums = msg.get("summaries", {})
-                if sums and any(sums.values()):
-                    _render_sources_columns(sums)
-                # AI answer
+                # Answer first (the main reply), sources collapsed below
                 with st.chat_message("assistant"):
                     st.markdown(msg["content"])
+                    sums = msg.get("summaries", {})
+                    if sums and any(sums.values()):
+                        _render_sources_columns(sums)
 
     # ══════════════════════════════════════════════════════════════
     #  Chat input — always visible
@@ -1063,13 +1060,11 @@ def page_chat():
         with st.spinner("🔍 Searching Web · Glassdoor · Job Portals…"):
             ans, srcs, sums = _chat_process(prompt)
 
-        # 3-column synthesised summaries (full width, outside chat bubble)
-        if sums and any(sums.values()):
-            _render_sources_columns(sums)
-
-        # AI answer
+        # Answer first, sources collapsed below
         with st.chat_message("assistant"):
             st.markdown(ans)
+            if sums and any(sums.values()):
+                _render_sources_columns(sums)
 
         chat_history.append({"role": "user",      "content": prompt})
         chat_history.append({"role": "assistant", "content": ans,
