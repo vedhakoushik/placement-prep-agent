@@ -829,12 +829,26 @@ def _chat_process(prompt: str):
         except Exception:
             return []
 
-    # 3 parallel searches with the full question
+    # ── Build focused, source-specific queries from the question ──────
+    # Detect a company (capitalised word) and the core topic of the question
+    _stop = {"what","which","how","why","when","where","is","are","the","a","an",
+             "to","of","in","on","for","do","does","did","can","should","tell","me",
+             "about","give","explain","at","with","and","or","i","you","your","it"}
+    words   = [w.strip("?.,!") for w in prompt.split()]
+    company = next((w for w in words if len(w) > 1 and w[0].isupper()), "")
+    topic   = " ".join(w for w in words if w.lower() not in _stop and len(w) > 1)
+    anchor  = (f"{company} {topic}".strip() or prompt)
+
+    # Each source gets a query tuned to what that site is good for
+    web_q  = f"{prompt} interview preparation tips"
+    gd_q   = f"{company or anchor} interview experience difficulty rating review"
+    jobs_q = f"{company or anchor} job requirements skills eligibility"
+
     with ThreadPoolExecutor(max_workers=3) as ex:
-        f_web  = ex.submit(_search, prompt, 5)
-        f_gd   = ex.submit(_search_domains, prompt, ["glassdoor.com"], 3)
-        f_jobs = ex.submit(_search_domains, prompt,
-                           ["naukri.com", "linkedin.com", "indeed.com", "instahyre.com"], 3)
+        f_web  = ex.submit(_search, web_q, 5)
+        f_gd   = ex.submit(_search_domains, gd_q, ["glassdoor.com"], 3)
+        f_jobs = ex.submit(_search_domains, jobs_q,
+                           ["naukri.com", "linkedin.com", "indeed.com", "ambitionbox.com"], 3)
         sources = {
             "general":   _safe(f_web),
             "glassdoor": _safe(f_gd),
@@ -854,19 +868,22 @@ def _chat_process(prompt: str):
     # ONE structured Gemini call — returns per-source summaries + full answer
     structured_prompt = (
         "You are a sharp, professional placement-prep coach. Be concise and scannable.\n"
-        "Use the search results below. Respond EXACTLY in this format:\n\n"
-        "WEB: [max 2 short sentences — key facts only, no filler]\n"
-        "GLASSDOOR: [max 2 short sentences — rating, difficulty, culture]\n"
-        "JOBS: [max 2 short sentences — required skills, CTC if known]\n"
+        "CRITICAL: Answer the EXACT question asked. Do NOT give a generic company overview.\n"
+        "If the search results don't cover the question, say so briefly and answer from "
+        "your own knowledge — never pad with unrelated facts.\n\n"
+        "Respond EXACTLY in this format:\n\n"
+        "WEB: [max 2 sentences — only facts relevant to THE QUESTION]\n"
+        "GLASSDOOR: [max 2 sentences — rating, interview difficulty, culture]\n"
+        "JOBS: [max 2 sentences — required skills, eligibility, CTC if known]\n"
         "ANSWER:\n"
-        "[Answer the question like Claude would — direct and well-structured:\n"
-        " - Open with ONE bold takeaway line.\n"
-        " - Then 3-5 markdown bullet points (use '- ' and **bold** for key terms).\n"
-        " - Keep total under 120 words unless the question explicitly asks for depth.\n"
-        " - No preamble like 'Based on the results'. Just answer.\n"
-        " - If listing rounds/steps, use a numbered list.]\n\n"
+        "[Answer THE SPECIFIC QUESTION like Claude would:\n"
+        " - Open with ONE bold sentence that directly answers it.\n"
+        " - Then 3-5 markdown bullets ('- ', **bold** key terms) with concrete specifics.\n"
+        " - Stay strictly on-topic to the question — no filler company description.\n"
+        " - Under 120 words unless depth is requested. Numbered list for rounds/steps.\n"
+        " - No preamble like 'Based on the results'.]\n\n"
         f"Search results:\n{context[:3000]}\n\n"
-        f"Student question: {prompt}"
+        f"THE QUESTION (answer this exactly): {prompt}"
     )
 
     summaries = {"general": "", "glassdoor": "", "jobs": ""}
