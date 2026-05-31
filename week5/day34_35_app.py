@@ -80,7 +80,12 @@ CSS = """
   --red:#fca5a5; --red-bg:#2a1414; --red-bd:#5a2f2f;
   --blue:#93c5fd; --blue-bg:#14203a; --blue-bd:#2f4373;
 }
-* { font-family:'Manrope',sans-serif !important; }
+*:not([class*="material"]):not([class*="icon"]):not([data-testid*="Icon"]) { font-family:'Manrope',sans-serif !important; }
+/* Restore Material Symbols / icon ligature fonts (collapse arrow etc.) */
+[class*="material-symbols"], [class*="material-icons"], span[data-testid*="Icon"] i,
+[data-testid="stIconMaterial"], .material-symbols-outlined, .material-symbols-rounded {
+  font-family:'Material Symbols Outlined','Material Symbols Rounded','Material Icons' !important;
+}
 
 .stApp {
   background:
