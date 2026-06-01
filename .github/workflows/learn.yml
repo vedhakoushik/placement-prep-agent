@@ -1,0 +1,47 @@
+# ─────────────────────────────────────────────────────────────
+#  learn.yml — My first hand-written GitHub Actions workflow
+#
+#  Goal: understand every line by writing it myself.
+#  It runs a small Python script and prints the output in the
+#  Actions tab. No deploy, no secrets — just the core mechanics.
+# ─────────────────────────────────────────────────────────────
+
+name: Learn Actions          # shows up as the workflow name in the UI
+
+# ── WHEN does it run? (the trigger / event) ──────────────────
+on:
+  push:                      # every time I push code
+    branches: ["**"]         # on any branch
+  workflow_dispatch:         # AND a manual "Run workflow" button in the UI
+
+# ── WHAT does it do? (jobs → steps) ──────────────────────────
+jobs:
+  say-hello:                 # job id (I named it)
+    name: Say hello + run script
+    runs-on: ubuntu-latest   # the VM GitHub gives me
+
+    steps:
+      # Step 1 — copy my repo onto the runner
+      - name: Checkout my code
+        uses: actions/checkout@v4
+
+      # Step 2 — install Python on the runner
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Step 3 — a plain shell command (no action, just 'run')
+      - name: Print a message
+        run: echo "Starting my first workflow!"
+
+      # Step 4 — run MY script (the 'small thing')
+      - name: Run hello_ci.py
+        run: python scripts/hello_ci.py
+
+      # Step 5 — write to the Actions summary page (nice formatting)
+      - name: Add a summary
+        run: |
+          echo "## ✅ My workflow ran!" >> $GITHUB_STEP_SUMMARY
+          echo "Triggered by **${{ github.event_name }}** on branch **${{ github.ref_name }}**" >> $GITHUB_STEP_SUMMARY
+          echo "Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
