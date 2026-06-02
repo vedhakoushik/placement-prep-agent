@@ -1,109 +1,26 @@
 # ═══════════════════════════════════════════════════════════════════════
-#  docker-compose.yml — Two-container production setup  (Day 43-44)
+#  docker-compose.yml — Single container, all-in-one
 #
-#  Services:
-#    chromadb  — vector database  (official image, named volume)
-#    app       — Streamlit UI     (built from our Dockerfile)
+#  ONE service: the Streamlit app.
+#  It handles everything:
+#    - Frontend  (Streamlit UI rendered in the browser)
+#    - Backend   (Python logic: search, AI, chat history)
+#    - API calls (Gemini + Tavily called directly from Python)
+#    - Chatbot   (the Chat page)
 #
-#  Three concepts demonstrated here:
+#  No separate backend server. No separate API server.
+#  One port (8501), one process, one container.
 #
-#  1. VOLUMES
-#     chroma_data is a named Docker volume. Data written by the chromadb
-#     container survives `docker compose down` and reappears on `up`.
-#     Without it, every restart wipes the vector database.
-#
-#  2. ENVIRONMENT
-#     API keys come from .env via `env_file` — never hardcoded here.
-#     Docker-specific config (CHROMA_HOST, PORT) goes under `environment`
-#     so it's always set regardless of the .env file.
-#
-#  3. DEPENDS_ON
-#     `condition: service_started` ensures the chromadb container has
-#     started before Streamlit launches. The Streamlit app only connects
-#     to ChromaDB when a user triggers a research session — by that time
-#     ChromaDB has had plenty of time to finish booting. This is the
-#     correct production pattern: services should be resilient to slow
-#     dependencies rather than blocking startup on a health check.
-#
-#     NOTE: service_healthy is the stricter form (waits for a health check
-#     to pass). It's the right choice when the app connects to the DB
-#     immediately on startup (e.g. running migrations). We don't do that.
-#
-#  Internal networking:
-#     Both services join `placement-net`. Docker resolves the service name
-#     "chromadb" to its container IP — no hardcoded addresses needed.
+#  This is the same architecture Railway runs in production.
 #
 #  Commands:
-#    docker compose up           # start both containers (build if needed)
-#    docker compose up --build   # force rebuild of app image
-#    docker compose down         # stop + remove containers (data survives)
-#    docker compose down -v      # stop + remove containers + wipe volumes
-#    docker compose logs -f      # tail all logs
-#    docker compose logs chromadb  # chromadb logs only
-#    docker compose ps           # check status of each service
+#    docker compose up           # build + start
+#    docker compose up --build   # force rebuild
+#    docker compose down         # stop
+#    docker compose logs -f      # tail logs
 # ═══════════════════════════════════════════════════════════════════════
 
 services:
-
-  # ── Container 1: ChromaDB (vector database) ──────────────────────────
-  #
-  #  Uses the official chromadb/chroma image — no Dockerfile needed.
-  #
-  #  VOLUME: chromadb 0.5+ saves to /data inside the container.
-  #  We mount the named volume `chroma_data` there so data survives restarts.
-  #
-  #  ENVIRONMENT: ANONYMIZED_TELEMETRY=FALSE opts out of usage stats.
-  #  IS_PERSISTENT is not set — persistence is the default in chromadb 0.5+.
-  #
-  #  HEALTHCHECK: monitors the container's status (visible in `docker ps`).
-  #  Uses Python's socket module — Python is always present in this image;
-  #  curl/wget/nc are not. The health check is for monitoring only here;
-  #  it does NOT block the app container from starting (see depends_on below).
-  #
-  chromadb:
-    image: chromadb/chroma:latest
-    container_name: placement-prep-chromadb
-
-    ports:
-      - "8000:8000"
-
-    volumes:
-      - chroma_data:/data            # ← CONCEPT 1: named volume at chromadb's actual path
-
-    environment:                     # ← CONCEPT 2: non-secret config
-      - ANONYMIZED_TELEMETRY=FALSE
-
-    networks:
-      - placement-net
-
-    healthcheck:
-      # Monitoring only — does NOT block the app from starting.
-      # Python socket check is more reliable than curl (not in this image).
-      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('localhost', 8000), timeout=5)"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-
-    restart: unless-stopped
-
-
-  # ── Container 2: Streamlit app ───────────────────────────────────────
-  #
-  #  Built from our Dockerfile (multi-stage: builder + runtime stages).
-  #
-  #  ENV_FILE: reads GEMINI_API_KEY, TAVILY_API_KEY etc. from .env at runtime.
-  #  The file is never copied into the image — keys stay on your host only.
-  #
-  #  ENVIRONMENT overrides: CHROMA_HOST=chromadb tells src/chroma_client.py
-  #  to use HttpClient instead of PersistentClient. Docker resolves the name
-  #  "chromadb" to the container's IP on placement-net automatically.
-  #
-  #  DEPENDS_ON: condition: service_started means Docker starts the app
-  #  as soon as the chromadb container is running, without waiting for its
-  #  health check to pass. The app only connects to ChromaDB on demand
-  #  (when the user runs a research session), so there is no race condition.
-  #
   app:
     build:
       context: .
@@ -114,55 +31,17 @@ services:
     container_name: placement-prep-app
 
     ports:
-      - "8501:8501"
+      - "8501:8501"           # the only port — UI + backend + API all here
 
-    env_file:                        # ← CONCEPT 2: secrets injected at runtime
-      - .env
+    env_file:
+      - .env                  # GEMINI_API_KEY, TAVILY_API_KEY
 
-    environment:                     # ← CONCEPT 2: Docker config on top of .env
+    environment:
       - PYTHONUNBUFFERED=1
       - STREAMLIT_SERVER_HEADLESS=true
-      - CHROMA_HOST=chromadb         # Docker resolves this to the chromadb container
-      - CHROMA_PORT=8000
-
-    depends_on:                      # ← CONCEPT 3: ordering guarantee
-      chromadb:
-        condition: service_started   # container is running — app connects lazily on demand
-
-    networks:
-      - placement-net
 
     volumes:
-      - .:/app                       # bind mount for live reload during development
-      - /app/__pycache__             # exclude pycache from the mount
+      - .:/app                # bind mount for live reload during development
+      - /app/__pycache__
 
     restart: unless-stopped
-
-
-# ── Named volumes ────────────────────────────────────────────────────
-#
-#  Named volume vs bind mount:
-#
-#  chroma_data (named volume):
-#    Docker manages the storage location.
-#    Survives `docker compose down`. Wiped only by `docker compose down -v`.
-#    Use this for all database storage.
-#
-#  .:/app (bind mount on the app service):
-#    You control the path. Changes on your host appear in the container live.
-#    Use this for development hot-reload only — never for database storage.
-#
-volumes:
-  chroma_data:
-    driver: local
-
-
-# ── Internal network ─────────────────────────────────────────────────
-#
-#  Both containers join placement-net. Docker registers each service name
-#  as a DNS hostname, so the app reaches ChromaDB at http://chromadb:8000.
-#  Traffic never leaves the Docker host. Named explicitly for clarity.
-#
-networks:
-  placement-net:
-    driver: bridge
