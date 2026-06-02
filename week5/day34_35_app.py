@@ -1401,7 +1401,7 @@ def main():
     tav_ok  = bool(os.getenv("TAVILY_API_KEY"))
     online  = gem_ok and tav_ok
     status_dot = "#86efac" if online else "#fca5a5"
-    status_txt = "AI Ready" if online else "Keys missing"
+    status_txt = "AI Ready  ·  v1.0" if online else "Keys missing"
 
     st.sidebar.markdown(
         f'<div class="user-chip">'
