@@ -1,0 +1,55 @@
+# ─────────────────────────────────────────────
+#  my_first_trigger.yml
+#  A workflow I built to learn manual triggers
+#  with custom inputs.
+# ─────────────────────────────────────────────
+
+name: My First Trigger        # name shown in Actions tab
+
+# Only a manual button — no auto-run on push
+on:
+  workflow_dispatch:
+    inputs:                   # input fields shown in the Run dialog
+      company:
+        description: "Company name to research"
+        required: true
+        default: "Google"
+      role:
+        description: "Job role"
+        required: false
+        default: "SDE-2"
+
+jobs:
+  run-my-action:
+    name: Print my inputs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Show what was passed in
+        run: |
+          echo "Company : ${{ github.event.inputs.company }}"
+          echo "Role    : ${{ github.event.inputs.role }}"
+          echo "Triggered by: ${{ github.actor }}"
+
+      - name: Run my Python script with the inputs
+        run: |
+          python scripts/hello_ci.py
+          echo "---"
+          echo "I would now research: ${{ github.event.inputs.company }} for ${{ github.event.inputs.role }}"
+
+      - name: Write a summary
+        run: |
+          echo "## My First Manual Trigger" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Company | ${{ github.event.inputs.company }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Role | ${{ github.event.inputs.role }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Triggered by | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
