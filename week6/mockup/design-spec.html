@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Placement Prep Agent — Design Spec</title>
+<style>
+/* ─── RESET ──────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:"Inter","Segoe UI",sans-serif;background:#080b14;color:#e2e8f0;min-width:1400px}
+
+/* ─── TOKENS (design system) ─────────────────────────── */
+:root{
+  --bg-base:#0f1117;
+  --bg-surface:#1a1d27;
+  --bg-elevated:#22263a;
+  --border:#2a2d3a;
+  --border-active:#4F46E5;
+  --primary:#4F46E5;
+  --primary-2:#7C3AED;
+  --accent-text:#818cf8;
+  --text-primary:#f1f5f9;
+  --text-secondary:#94a3b8;
+  --text-muted:#4b5563;
+  --green:#4ade80;
+  --green-bg:#052e16;
+  --orange:#fb923c;
+  --orange-bg:#431407;
+  --red:#f87171;
+  --red-bg:#450a0a;
+  --radius-sm:6px;
+  --radius-md:10px;
+  --radius-lg:14px;
+  --radius-xl:20px;
+}
+
+/* ─── DOC HEADER ─────────────────────────────────────── */
+.doc-header{
+  background:linear-gradient(135deg,#12101f 0%,#1a1030 100%);
+  border-bottom:1px solid #2a2d3a;
+  padding:32px 48px 28px;
+}
+.doc-title{font-size:28px;font-weight:800;color:#fff;letter-spacing:-0.5px}
+.doc-title span{background:linear-gradient(135deg,#818cf8,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.doc-meta{display:flex;gap:24px;margin-top:10px;flex-wrap:wrap}
+.doc-meta-item{font-size:12px;color:#6b7280}
+.doc-meta-item strong{color:#94a3b8}
+
+/* ─── SECTION WRAPPER ────────────────────────────────── */
+.spec-section{padding:48px 48px 0}
+.spec-section-title{
+  font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;
+  color:#4F46E5;margin-bottom:6px;
+}
+.spec-section-label{
+  font-size:22px;font-weight:700;color:#fff;margin-bottom:6px;
+}
+.spec-section-desc{font-size:13px;color:#6b7280;margin-bottom:32px;max-width:700px;line-height:1.6}
+
+/* ─── TOKEN GRID ─────────────────────────────────────── */
+.token-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:48px}
+.token-card{background:#1a1d27;border:1px solid #2a2d3a;border-radius:10px;overflow:hidden}
+.token-swatch{height:44px}
+.token-info{padding:10px 12px}
+.token-name{font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em}
+.token-value{font-size:12px;color:#6b7280;margin-top:2px;font-family:monospace}
+
+/* ─── TYPE SCALE ─────────────────────────────────────── */
+.type-row{display:flex;align-items:baseline;gap:20px;padding:14px 0;border-bottom:1px solid #1f2937}
+.type-label{font-size:11px;color:#4b5563;width:140px;flex-shrink:0;font-family:monospace}
+.type-sample{color:#e2e8f0}
+
+/* ─── PAGE ANNOTATION WRAPPER ───────────────────────── */
+.page-wrap{
+  display:flex;gap:32px;align-items:flex-start;
+  padding-bottom:48px;
+}
+.annotation-panel{
+  width:260px;flex-shrink:0;
+  display:flex;flex-direction:column;gap:10px;
+  position:sticky;top:24px;
+}
+.ann-item{
+  background:#1a1d27;border:1px solid #2a2d3a;border-radius:8px;
+  padding:10px 12px;cursor:default;transition:border-color 0.15s;
+}
+.ann-item:hover{border-color:#4F46E5}
+.ann-item.highlight{border-color:#4F46E5;background:#1e2035}
+.ann-key{font-size:10px;font-weight:700;color:#4F46E5;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:3px;font-family:monospace}
+.ann-name{font-size:12px;font-weight:600;color:#e2e8f0;margin-bottom:2px}
+.ann-desc{font-size:11px;color:#6b7280;line-height:1.5}
+.ann-props{margin-top:6px;display:flex;flex-wrap:wrap;gap:4px}
+.ann-prop{font-size:10px;background:#0f1117;border:1px solid #2a2d3a;border-radius:4px;padding:2px 6px;color:#94a3b8;font-family:monospace}
+
+/* ─── THE ACTUAL UI (annotated) ─────────────────────── */
+.ui-frame{
+  flex:1;border:1px solid #2a2d3a;border-radius:14px;overflow:hidden;
+  position:relative;box-shadow:0 24px 60px rgba(0,0,0,0.5);
+}
+.annotated{position:relative}
+.ann-box{
+  position:absolute;pointer-events:none;z-index:10;
+  border:1.5px dashed;border-radius:4px;
+}
+.ann-tag{
+  position:absolute;top:-20px;left:0;
+  font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;
+  padding:2px 6px;border-radius:4px;font-family:monospace;white-space:nowrap;
+}
+
+/* ─── SIDEBAR ────────────────────────────────────────── */
+.ui-shell{display:flex;min-height:760px}
+.ui-sidebar{
+  width:220px;background:var(--bg-surface);
+  border-right:1px solid var(--border);
+  padding:22px 14px;display:flex;flex-direction:column;flex-shrink:0;
+}
+.ui-logo{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.ui-logo-icon{
+  width:32px;height:32px;border-radius:8px;
+  background:linear-gradient(135deg,#4F46E5,#7C3AED);
+  display:flex;align-items:center;justify-content:center;font-size:16px;
+}
+.ui-logo-text{font-size:15px;font-weight:700;color:#fff}
+.ui-tagline{font-size:10px;color:#4b5563;margin-bottom:20px;padding-left:40px;font-style:italic}
+.ui-nav{display:flex;flex-direction:column;gap:3px}
+.ui-nav-item{
+  display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:8px;
+  font-size:13px;color:#94a3b8;cursor:pointer;
+}
+.ui-nav-item.active{
+  background:linear-gradient(135deg,#4F46E5,#7C3AED);color:#fff;font-weight:600;
+  box-shadow:0 4px 14px rgba(79,70,229,0.35);
+}
+.ui-nav-item:not(.active):hover{background:#22263a;color:#e2e8f0}
+.ui-nav-icon{font-size:14px;width:18px;text-align:center}
+.ui-divider{border:none;border-top:1px solid var(--border);margin:14px 0}
+.ui-sidebar-footer{margin-top:auto;font-size:10px;color:#374151;padding:0 11px}
+
+/* ─── MAIN CONTENT ───────────────────────────────────── */
+.ui-main{flex:1;padding:26px 30px;background:var(--bg-base);overflow:auto}
+
+/* page header */
+.ui-page-title{
+  font-size:22px;font-weight:800;letter-spacing:-0.3px;
+  background:linear-gradient(135deg,#818cf8,#a78bfa);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.ui-page-caption{font-size:12px;color:#6b7280;margin-top:3px;margin-bottom:20px}
+
+/* input card */
+.ui-card{
+  background:var(--bg-surface);border:1px solid var(--border);
+  border-radius:var(--radius-lg);padding:18px;margin-bottom:14px;
+}
+.ui-input-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.ui-input-group{display:flex;flex-direction:column;gap:5px}
+.ui-label{font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.08em}
+.ui-input{
+  background:var(--bg-base);border:1px solid var(--border-active);
+  border-radius:var(--radius-sm);padding:9px 12px;color:#fff;font-size:13px;
+  font-family:inherit;outline:none;
+}
+.ui-select{
+  background:var(--bg-base);border:1px solid var(--border);
+  border-radius:var(--radius-sm);padding:9px 12px;color:#94a3b8;font-size:13px;
+  font-family:inherit;outline:none;cursor:pointer;
+}
+.ui-btn{
+  background:linear-gradient(135deg,#4F46E5,#7C3AED);
+  color:#fff;border:none;border-radius:var(--radius-sm);
+  padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;
+  width:100%;display:flex;align-items:center;justify-content:center;gap:7px;
+  box-shadow:0 4px 16px rgba(79,70,229,0.4);font-family:inherit;
+}
+
+/* progress tracker */
+.ui-progress-card{
+  background:var(--bg-surface);border:1.5px solid var(--border-active);
+  border-radius:var(--radius-lg);padding:16px 18px;margin-bottom:14px;
+}
+.ui-progress-header{
+  font-size:12px;font-weight:600;color:var(--accent-text);
+  margin-bottom:13px;display:flex;align-items:center;gap:8px;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner{
+  width:13px;height:13px;border:2px solid #312e81;border-top-color:#818cf8;
+  border-radius:50%;animation:spin 0.8s linear infinite;flex-shrink:0;
+}
+.ui-steps{display:flex;flex-direction:column;gap:8px}
+.ui-step{display:flex;align-items:center;gap:10px;font-size:12px}
+.ui-step-icon{
+  width:20px;height:20px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;
+}
+.ui-step.done .ui-step-icon{background:#065f46;color:#4ade80}
+.ui-step.done .ui-step-label{color:#4ade80}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.ui-step.running .ui-step-label{color:#818cf8;animation:pulse 1.5s ease-in-out infinite}
+.ui-step.pending .ui-step-icon{background:#1f2937;color:#374151}
+.ui-step.pending .ui-step-label{color:#374151}
+
+/* result card */
+.ui-company-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px}
+.ui-company-name{font-size:18px;font-weight:800;color:#fff;letter-spacing:-0.3px}
+.ui-company-sub{font-size:11px;color:#6b7280;margin-top:2px}
+.ui-badge{
+  background:linear-gradient(135deg,#1e1b4b,#2e1065);
+  color:#a78bfa;font-size:10px;font-weight:700;
+  padding:4px 10px;border-radius:20px;border:1px solid #3730a3;
+  white-space:nowrap;
+}
+.ui-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+.ui-metric{
+  background:var(--bg-base);border:1px solid var(--border);
+  border-radius:var(--radius-sm);padding:10px 12px;text-align:center;
+}
+.ui-metric-label{font-size:9px;color:#374151;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:3px}
+.ui-metric-value{font-size:15px;font-weight:800;color:#e2e8f0}
+
+/* section header */
+.ui-section-title{
+  font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.1em;
+  margin-bottom:9px;display:flex;align-items:center;gap:8px;
+}
+.ui-section-title::after{content:"";flex:1;height:1px;background:#1f2937}
+.ui-summary{font-size:12px;line-height:1.7;color:#cbd5e1;margin-bottom:0}
+
+/* questions */
+.ui-questions{display:flex;flex-direction:column;gap:7px;margin-top:13px}
+.ui-q{
+  background:var(--bg-base);border:1px solid var(--border);
+  border-radius:var(--radius-sm);padding:11px 13px;
+  display:flex;align-items:flex-start;gap:9px;
+  transition:border-color 0.15s,transform 0.15s;
+}
+.ui-q:hover{border-color:#4F46E5;transform:translateX(2px)}
+.ui-q-num{font-size:10px;font-weight:700;color:#374151;min-width:18px;margin-top:1px}
+.ui-q-text{font-size:12px;color:#cbd5e1;line-height:1.5;flex:1}
+.badge{font-size:9px;font-weight:700;padding:3px 7px;border-radius:10px;flex-shrink:0;margin-top:1px}
+.badge-easy{background:#052e16;color:#4ade80;border:1px solid #14532d}
+.badge-med{background:#431407;color:#fb923c;border:1px solid #7c2d12}
+.badge-hard{background:#450a0a;color:#f87171;border:1px solid #7f1d1d}
+
+/* ─── PAGE TABS ──────────────────────────────────────── */
+.page-tabs{display:flex;gap:8px;margin-bottom:28px}
+.page-tab{
+  padding:8px 18px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;
+  border:1px solid #2a2d3a;color:#6b7280;transition:all 0.15s;
+}
+.page-tab.active{background:#4F46E5;color:#fff;border-color:#4F46E5}
+.page-tab:not(.active):hover{border-color:#4F46E5;color:#818cf8}
+
+/* ─── CHAT PAGE ──────────────────────────────────────── */
+.chat-messages{display:flex;flex-direction:column;gap:12px;margin-bottom:14px}
+.chat-msg{display:flex;gap:10px;align-items:flex-start}
+.chat-msg.assistant{flex-direction:row-reverse}
+.chat-avatar{
+  width:28px;height:28px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:13px;
+}
+.chat-avatar.user-av{background:#1e3a5f;border:1px solid #1d4ed8}
+.chat-avatar.bot-av{background:linear-gradient(135deg,#4F46E5,#7C3AED)}
+.chat-bubble{
+  max-width:75%;padding:10px 13px;border-radius:10px;font-size:12px;line-height:1.6;
+}
+.chat-msg:not(.assistant) .chat-bubble{background:#1a1d27;border:1px solid #2a2d3a;color:#e2e8f0;border-top-left-radius:2px}
+.chat-msg.assistant .chat-bubble{background:linear-gradient(135deg,#1e1b4b,#2e1065);border:1px solid #3730a3;color:#c4b5fd;border-top-right-radius:2px}
+.chat-input-row{
+  display:flex;gap:8px;background:#1a1d27;border:1px solid #2a2d3a;
+  border-radius:10px;padding:10px 14px;align-items:center;
+}
+.chat-input{background:transparent;border:none;flex:1;color:#e2e8f0;font-size:13px;font-family:inherit;outline:none}
+.chat-send{
+  background:linear-gradient(135deg,#4F46E5,#7C3AED);border:none;
+  border-radius:6px;width:30px;height:30px;display:flex;align-items:center;
+  justify-content:center;cursor:pointer;font-size:13px;flex-shrink:0;
+}
+.context-chip{
+  display:inline-flex;align-items:center;gap:6px;
+  background:#1e1b4b;border:1px solid #3730a3;border-radius:20px;
+  font-size:11px;color:#818cf8;padding:4px 10px;margin-bottom:14px;
+}
+
+/* ─── COMPANIES PAGE ─────────────────────────────────── */
+.companies-table{width:100%;border-collapse:collapse;margin-bottom:16px}
+.companies-table th{
+  background:#1a1d27;border-bottom:1px solid #2a2d3a;padding:9px 12px;
+  font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.08em;
+  text-align:left;
+}
+.companies-table td{
+  padding:10px 12px;font-size:12px;color:#cbd5e1;
+  border-bottom:1px solid #1f2937;
+}
+.companies-table tr:hover td{background:#1a1d27}
+.status-dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:6px}
+.rec-card{
+  background:linear-gradient(135deg,#1e1b4b,#2e1065);
+  border:1px solid #3730a3;border-radius:10px;padding:14px 16px;
+  font-size:12px;color:#c4b5fd;line-height:1.6;
+}
+.rec-card strong{color:#a78bfa;display:block;margin-bottom:4px;font-size:13px}
+
+/* ─── COLOUR PALETTE DISPLAY ─────────────────────────── */
+.palette-row{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+.swatch{
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+}
+.swatch-color{width:56px;height:40px;border-radius:6px;border:1px solid #2a2d3a}
+.swatch-name{font-size:9px;color:#6b7280;font-family:monospace;text-align:center}
+
+/* ─── COMPONENT MAP ──────────────────────────────────── */
+.comp-map{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:48px;
+}
+.comp-card{
+  background:#1a1d27;border:1px solid #2a2d3a;border-radius:10px;
+  padding:14px;
+}
+.comp-card-title{font-size:11px;font-weight:700;color:#818cf8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;font-family:monospace}
+.comp-card-desc{font-size:12px;color:#94a3b8;line-height:1.5;margin-bottom:8px}
+.comp-props{display:flex;flex-direction:column;gap:4px}
+.comp-prop-row{display:flex;justify-content:space-between;font-size:11px}
+.comp-prop-key{color:#4b5563}
+.comp-prop-val{color:#94a3b8;font-family:monospace}
+
+/* ─── DIVIDER ────────────────────────────────────────── */
+.big-divider{
+  border:none;border-top:1px solid #1f2937;
+  margin:0 48px;
+}
+.section-gap{height:48px}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════ DOC HEADER ══════════════════════ -->
+<div class="doc-header">
+  <div class="doc-title">Placement Prep Agent — <span>Design Spec</span></div>
+  <div class="doc-meta">
+    <div class="doc-meta-item"><strong>Version</strong> · v1.0 (pre-implementation)</div>
+    <div class="doc-meta-item"><strong>Pages</strong> · Research · Chat · My Companies</div>
+    <div class="doc-meta-item"><strong>Theme</strong> · Dark (default)</div>
+    <div class="doc-meta-item"><strong>Stack</strong> · Streamlit + Custom CSS</div>
+    <div class="doc-meta-item"><strong>Status</strong> · Awaiting confirmation</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════ 1. COLOUR TOKENS ════════════════ -->
+<div class="spec-section">
+  <div class="spec-section-title">Section 01</div>
+  <div class="spec-section-label">Colour Tokens</div>
+  <div class="spec-section-desc">All colours used across every component. Use CSS variables — never hardcode hex values in component code.</div>
+
+  <div class="palette-row">
+    <div class="swatch"><div class="swatch-color" style="background:#080b14"></div><div class="swatch-name">--bg-canvas<br/>#080b14</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#0f1117"></div><div class="swatch-name">--bg-base<br/>#0f1117</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#1a1d27"></div><div class="swatch-name">--bg-surface<br/>#1a1d27</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#22263a"></div><div class="swatch-name">--bg-elevated<br/>#22263a</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#2a2d3a"></div><div class="swatch-name">--border<br/>#2a2d3a</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#4F46E5"></div><div class="swatch-name">--primary<br/>#4F46E5</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#7C3AED"></div><div class="swatch-name">--primary-2<br/>#7C3AED</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#818cf8"></div><div class="swatch-name">--accent<br/>#818cf8</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#4ade80"></div><div class="swatch-name">--green<br/>#4ade80</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#fb923c"></div><div class="swatch-name">--orange<br/>#fb923c</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#f87171"></div><div class="swatch-name">--red<br/>#f87171</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#f1f5f9"></div><div class="swatch-name">--text-hi<br/>#f1f5f9</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#94a3b8"></div><div class="swatch-name">--text-mid<br/>#94a3b8</div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#4b5563"></div><div class="swatch-name">--text-lo<br/>#4b5563</div></div>
+  </div>
+</div>
+
+<div class="big-divider"></div><div class="section-gap"></div>
+
+<!-- ══════════════════════════ 2. TYPE SCALE ═══════════════════ -->
+<div class="spec-section">
+  <div class="spec-section-title">Section 02</div>
+  <div class="spec-section-label">Typography Scale</div>
+  <div class="spec-section-desc">Font: <strong style="color:#818cf8">Inter</strong> (fallback: Segoe UI, sans-serif). All weights from system font stack.</div>
+
+  <div style="margin-bottom:48px">
+    <div class="type-row"><div class="type-label">display / 28px 800</div><div class="type-sample" style="font-size:28px;font-weight:800;background:linear-gradient(135deg,#818cf8,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent">Company Research</div></div>
+    <div class="type-row"><div class="type-label">heading-1 / 22px 800</div><div class="type-sample" style="font-size:22px;font-weight:800">Google — Software Engineer</div></div>
+    <div class="type-row"><div class="type-label">heading-2 / 18px 700</div><div class="type-sample" style="font-size:18px;font-weight:700">Interview Summary</div></div>
+    <div class="type-row"><div class="type-label">label / 10px 700 caps</div><div class="type-sample" style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#6b7280">Section Label</div></div>
+    <div class="type-row"><div class="type-label">body / 13px 400</div><div class="type-sample" style="font-size:13px;color:#cbd5e1;line-height:1.7">Google's Software Engineer interviews heavily emphasise data structures and algorithms.</div></div>
+    <div class="type-row"><div class="type-label">caption / 11px 400</div><div class="type-sample" style="font-size:11px;color:#6b7280">Enter a company and role to generate a full interview prep guide.</div></div>
+    <div class="type-row"><div class="type-label">mono / 10px</div><div class="type-sample" style="font-size:10px;color:#818cf8;font-family:monospace">COMPONENT-KEY · #4F46E5 · 14px/700</div></div>
+  </div>
+</div>
+
+<div class="big-divider"></div><div class="section-gap"></div>
+
+<!-- ══════════════════════════ 3. PAGE 1 — RESEARCH ═══════════ -->
+<div class="spec-section">
+  <div class="spec-section-title">Section 03 · Page 1 of 3</div>
+  <div class="spec-section-label">Research Page — Annotated Layout</div>
+  <div class="spec-section-desc">The primary page. Every numbered box below corresponds to an annotation entry on the right panel. All measurements in px.</div>
+
+  <div class="page-wrap">
+
+    <!-- LEFT: annotation panel -->
+    <div class="annotation-panel">
+
+      <div class="ann-item highlight">
+        <div class="ann-key">A · SIDEBAR</div>
+        <div class="ann-name">App Sidebar</div>
+        <div class="ann-desc">Fixed left nav. Holds logo, nav items, and week badge.</div>
+        <div class="ann-props">
+          <span class="ann-prop">w: 220px</span>
+          <span class="ann-prop">bg: --bg-surface</span>
+          <span class="ann-prop">border-right: --border</span>
+        </div>
+      </div>
+
+      <div class="ann-item">
+        <div class="ann-key">A1 · LOGO-BLOCK</div>
+        <div class="ann-name">Logo + Tagline</div>
+        <div class="ann-desc">32px gradient icon + app name + italic tagline.</div>
+        <div class="ann-props"><span class="ann-prop">gap: 8px</span><span class="ann-prop">icon: 32×32</span></div>
+      </div>
+
+      <div class="ann-item">
+        <div class="ann-key">A2 · NAV-ITEM</div>
+        <div class="ann-name">Navigation Item</div>
+        <div class="ann-desc">3 items: Research / Chat / My Companies. Active state uses gradient fill + shadow.</div>
+        <div class="ann-props"><span class="ann-prop">h: 38px</span><span class="ann-prop">radius: 8px</span><span class="ann-prop">shadow on active</span></div>
+      </div>
+
+      <div class="ann-item">
+        <div class="ann-key">B · PAGE-HEADER</div>
+        <div class="ann-name">Page Title Area</div>
+        <div class="ann-desc">Gradient text title + grey caption. No background — sits on canvas.</div>
+        <div class="ann-props"><span class="ann-prop">title: 22px 800</span><span class="ann-prop">caption: 12px</span><span class="ann-prop">mb: 20px</span></div>
+      </div>
+
+      <div class="ann-item">
+        <div class="ann-key">C · INPUT-CARD</div>
+        <div class="ann-name">Research Form</div>
+        <div class="ann-desc">2-column grid: Company + Role inputs, Focus dropdown, Research button.</div>
+        <div class="ann-props"><span class="ann-prop">grid: 1fr 1fr</span><span class="ann-prop">gap: 12px</span><span class="ann-prop">p: 18px</span></div>
+      </div>
+
+      <div class="ann-item">
+        <div class="ann-key">C1 · INPUT-FIELD</div>
+        <div class="ann-name">Text Input</div>
+        <div class="ann-desc">Filled state: --border-active (#4F46E5) border. Placeholder: --text-muted.</div>
+        <div class="ann-props"><span class="ann-prop">h: 38px</span><span class="ann-prop">radius: 6px</span><span class="ann-prop">bg: --bg-base</span></div>
+      </div>
+
+      <div class="ann-item">
+        <div class="ann-key">C2 · BTN-PRIMARY</div>
+        <div class="ann-name">Research Button</div>
+        <div class="ann-desc">Full-width gradient button. Hover: translateY(-1px) + stronger shadow.</div>
+        <div class="ann-props"><span class="ann-prop">gradient: primary→primary-2</span><span class="ann-prop">shadow: 0 4px 16px rgba(79,70,229,.4)</span></div>
+      </div>
+
+      <div class="ann-item">
+        <div class="ann-key">D · PROGRESS-TRACKER</div>
+        <div class="ann-name">Live Step Tracker</div>
+        <div class="ann-desc">Shows in real time while graph runs. Border turns --border-active. 4 step states: done / running / pending.</div>
+        <div class="ann-props"><span class="ann-prop">border: 1.5px --primary</span><span class="ann-prop">spinner: CSS @keyframes</span></div>
+      </div>
+
+      <div class="ann-item">
+        <div class="ann-key">E · RESULT-CARD</div>
+        <div class="ann-name">Company Info Card</div>
+        <div class="ann-desc">Fades in after graph completes (fadeInUp animation, 0.4s). Company name, role subtitle, MNC badge, 3 metrics.</div>
+        <div class="ann-props"><span class="ann-prop">animation: fadeInUp 0.4s</span><span class="ann-prop">metrics: 3-col grid</span></div>
+      </div>
+
+      <div class="ann-item">
+        <div class="ann-key">E1 · METRIC-CHIP</div>
+        <div class="ann-name">Stat Chip</div>
+        <div class="ann-desc">Founded / HQ / Type. Dark bg, centred. Label 9px caps, value 15px bold.</div>
+        <div class="ann-props"><span class="ann-prop">bg: --bg-base</span><span class="ann-prop">p: 10px 12px</span></div>
+      </div>
+
+      <div class="ann-item">
+        <div class="ann-key">F · QUESTIONS-CARD</div>
+        <div class="ann-name">Question List</div>
+        <div class="ann-desc">5 questions. Each row: Q number, question text, difficulty badge. Hover: left border turns primary + translateX(2px).</div>
+        <div class="ann-props"><span class="ann-prop">gap: 7px</span><span class="ann-prop">hover: slide right</span></div>
+      </div>
+
+      <div class="ann-item">
+        <div class="ann-key">F1 · DIFF-BADGE</div>
+        <div class="ann-name">Difficulty Badge</div>
+        <div class="ann-desc">3 variants: Easy (green), Medium (orange), Hard (red). Each has matching dark background + border.</div>
+        <div class="ann-props"><span class="ann-prop">Easy: #4ade80</span><span class="ann-prop">Med: #fb923c</span><span class="ann-prop">Hard: #f87171</span></div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT: actual UI mockup -->
+    <div class="ui-frame">
+      <div class="ui-shell annotated">
+
+        <!-- SIDEBAR -->
+        <div class="ui-sidebar">
+          <div class="ui-logo">
+            <div class="ui-logo-icon">🎯</div>
+            <div class="ui-logo-text">Placement Prep</div>
+          </div>
+          <div class="ui-tagline">AI-powered interview prep</div>
+          <div class="ui-nav">
+            <div class="ui-nav-item active"><span class="ui-nav-icon">🔍</span> Research</div>
+            <div class="ui-nav-item"><span class="ui-nav-icon">💬</span> Chat</div>
+            <div class="ui-nav-item"><span class="ui-nav-icon">🏢</span> My Companies</div>
+          </div>
+          <hr class="ui-divider"/>
+          <div class="ui-sidebar-footer">Week 5 · Day 34-35</div>
+        </div>
+
+        <!-- MAIN -->
+        <div class="ui-main">
+          <!-- B: page header -->
+          <div class="ui-page-title">Company Research</div>
+          <div class="ui-page-caption">Enter a company and role to generate a full interview prep guide.</div>
+
+          <!-- C: input card -->
+          <div class="ui-card">
+            <div class="ui-input-grid">
+              <div class="ui-input-group">
+                <div class="ui-label">Company</div>
+                <input class="ui-input" value="Google" readonly/>
+              </div>
+              <div class="ui-input-group">
+                <div class="ui-label">Role</div>
+                <input class="ui-input" value="Software Engineer" readonly/>
+              </div>
+              <div class="ui-input-group">
+                <div class="ui-label">Focus Area</div>
+                <select class="ui-select"><option>DSA</option></select>
+              </div>
+              <div style="display:flex;align-items:flex-end">
+                <button class="ui-btn">✨ &nbsp;Research</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- D: progress tracker -->
+          <div class="ui-progress-card">
+            <div class="ui-progress-header"><div class="spinner"></div> Synthesizing with AI…</div>
+            <div class="ui-steps">
+              <div class="ui-step done"><div class="ui-step-icon">✓</div><div class="ui-step-label">Company basics fetched</div></div>
+              <div class="ui-step done"><div class="ui-step-icon">✓</div><div class="ui-step-label">Interview data collected</div></div>
+              <div class="ui-step running"><div class="spinner"></div><div class="ui-step-label">Synthesizing with AI…</div></div>
+              <div class="ui-step pending"><div class="ui-step-icon" style="font-size:16px;line-height:1;color:#374151">·</div><div class="ui-step-label">Generating questions</div></div>
+            </div>
+          </div>
+
+          <!-- E: result card -->
+          <div class="ui-card" style="animation:none">
+            <div class="ui-company-header">
+              <div>
+                <div class="ui-company-name">Google</div>
+                <div class="ui-company-sub">Software Engineer · DSA Focus</div>
+              </div>
+              <div class="ui-badge">🏢 MNC</div>
+            </div>
+            <div class="ui-metrics">
+              <div class="ui-metric"><div class="ui-metric-label">Founded</div><div class="ui-metric-value">1998</div></div>
+              <div class="ui-metric"><div class="ui-metric-label">HQ</div><div class="ui-metric-value">Mtn View</div></div>
+              <div class="ui-metric"><div class="ui-metric-label">Type</div><div class="ui-metric-value">Product</div></div>
+            </div>
+            <div class="ui-section-title">Interview Summary</div>
+            <div class="ui-summary">Google's SWE interviews focus heavily on DSA — expect LeetCode medium/hard problems across 2–3 coding rounds, plus a system design round and a Googleyness (behavioural) round. Solve 150+ LeetCode problems and practise explaining complexity aloud.</div>
+          </div>
+
+          <!-- F: questions card -->
+          <div class="ui-card" style="animation:none">
+            <div class="ui-section-title">DSA Interview Questions</div>
+            <div class="ui-questions">
+              <div class="ui-q"><div class="ui-q-num">Q1</div><div class="ui-q-text">Longest subarray with sum equal to zero.</div><div class="badge badge-med">Medium</div></div>
+              <div class="ui-q"><div class="ui-q-num">Q2</div><div class="ui-q-text">Implement LRU Cache with O(1) get and put.</div><div class="badge badge-hard">Hard</div></div>
+              <div class="ui-q"><div class="ui-q-num">Q3</div><div class="ui-q-text">Zigzag level order traversal of a binary tree.</div><div class="badge badge-med">Medium</div></div>
+              <div class="ui-q"><div class="ui-q-num">Q4</div><div class="ui-q-text">Minimum coins required (coin change DP).</div><div class="badge badge-easy">Easy</div></div>
+              <div class="ui-q"><div class="ui-q-num">Q5</div><div class="ui-q-text">Detect cycle in directed graph using DFS.</div><div class="badge badge-hard">Hard</div></div>
+            </div>
+          </div>
+
+        </div><!-- /ui-main -->
+      </div><!-- /ui-shell -->
+    </div><!-- /ui-frame -->
+
+  </div><!-- /page-wrap -->
+</div>
+
+<div class="big-divider"></div><div class="section-gap"></div>
+
+<!-- ══════════════════════════ 4. PAGE 2 — CHAT ══════════════ -->
+<div class="spec-section">
+  <div class="spec-section-title">Section 04 · Page 2 of 3</div>
+  <div class="spec-section-label">Chat Page — Annotated Layout</div>
+  <div class="spec-section-desc">Conversational Q&amp;A backed by the session's research context. Messages stream in; context chip shows which company is active.</div>
+
+  <div class="page-wrap">
+
+    <div class="annotation-panel">
+      <div class="ann-item highlight">
+        <div class="ann-key">G · CONTEXT-CHIP</div>
+        <div class="ann-name">Active Context Badge</div>
+        <div class="ann-desc">Shows which company's research is loaded. Purple pill, left-aligned above messages.</div>
+        <div class="ann-props"><span class="ann-prop">bg: #1e1b4b</span><span class="ann-prop">border: #3730a3</span><span class="ann-prop">radius: 20px</span></div>
+      </div>
+      <div class="ann-item">
+        <div class="ann-key">H · CHAT-BUBBLE (user)</div>
+        <div class="ann-name">User Message</div>
+        <div class="ann-desc">Left aligned, dark surface bg, standard border. Avatar: blue circle with 👤.</div>
+        <div class="ann-props"><span class="ann-prop">bg: --bg-surface</span><span class="ann-prop">max-w: 75%</span><span class="ann-prop">radius: 10px 10px 10px 2px</span></div>
+      </div>
+      <div class="ann-item">
+        <div class="ann-key">H2 · CHAT-BUBBLE (bot)</div>
+        <div class="ann-name">Assistant Message</div>
+        <div class="ann-desc">Right aligned, gradient purple bg, purple text. Avatar: gradient circle with 🤖.</div>
+        <div class="ann-props"><span class="ann-prop">bg: gradient #1e1b4b→#2e1065</span><span class="ann-prop">color: #c4b5fd</span></div>
+      </div>
+      <div class="ann-item">
+        <div class="ann-key">I · CHAT-INPUT-ROW</div>
+        <div class="ann-name">Message Input Bar</div>
+        <div class="ann-desc">Full-width surface pill. Text input (flex:1) + send button. Pinned to bottom of chat area.</div>
+        <div class="ann-props"><span class="ann-prop">radius: 10px</span><span class="ann-prop">send: 30×30 gradient btn</span></div>
+      </div>
+    </div>
+
+    <div class="ui-frame">
+      <div class="ui-shell">
+        <div class="ui-sidebar">
+          <div class="ui-logo"><div class="ui-logo-icon">🎯</div><div class="ui-logo-text">Placement Prep</div></div>
+          <div class="ui-tagline">AI-powered interview prep</div>
+          <div class="ui-nav">
+            <div class="ui-nav-item"><span class="ui-nav-icon">🔍</span> Research</div>
+            <div class="ui-nav-item active"><span class="ui-nav-icon">💬</span> Chat</div>
+            <div class="ui-nav-item"><span class="ui-nav-icon">🏢</span> My Companies</div>
+          </div>
+          <hr class="ui-divider"/>
+          <div class="ui-sidebar-footer">Week 5 · Day 34-35</div>
+        </div>
+        <div class="ui-main">
+          <div class="ui-page-title">Ask Questions</div>
+          <div class="ui-page-caption">Ask follow-up questions about your research. Answers use your session's research context.</div>
+
+          <div class="context-chip">📌 Context: <strong style="margin-left:4px">Google · DSA</strong></div>
+
+          <div class="chat-messages">
+            <div class="chat-msg">
+              <div class="chat-avatar user-av">👤</div>
+              <div class="chat-bubble">What DSA topics should I prioritise for Google's coding rounds?</div>
+            </div>
+            <div class="chat-msg assistant">
+              <div class="chat-avatar bot-av">🤖</div>
+              <div class="chat-bubble">Based on the research, prioritise: <strong>arrays & hashing</strong> (35%), <strong>trees & graphs</strong> (30%), <strong>dynamic programming</strong> (25%), and <strong>sliding window</strong> (10%). Focus on LeetCode mediums — Google rarely asks easy problems in interviews.</div>
+            </div>
+            <div class="chat-msg">
+              <div class="chat-avatar user-av">👤</div>
+              <div class="chat-bubble">How many rounds does Google have?</div>
+            </div>
+            <div class="chat-msg assistant">
+              <div class="chat-avatar bot-av">🤖</div>
+              <div class="chat-bubble">Typically <strong>4–5 rounds</strong>: 2–3 coding rounds, 1 system design (for SDE-2+), and 1 Googleyness (behavioural) round. All conducted virtually via Google Meet + shared doc editor.</div>
+            </div>
+          </div>
+
+          <div class="chat-input-row">
+            <input class="chat-input" placeholder="Ask anything about your interview prep…" readonly/>
+            <button class="chat-send">➤</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="big-divider"></div><div class="section-gap"></div>
+
+<!-- ══════════════════════════ 5. PAGE 3 — MY COMPANIES ══════ -->
+<div class="spec-section">
+  <div class="spec-section-title">Section 05 · Page 3 of 3</div>
+  <div class="spec-section-label">My Companies Page — Annotated Layout</div>
+  <div class="spec-section-desc">Overview of all companies researched this session. Comparison table + AI recommendation card.</div>
+
+  <div class="page-wrap">
+
+    <div class="annotation-panel">
+      <div class="ann-item highlight">
+        <div class="ann-key">J · DATA-TABLE</div>
+        <div class="ann-name">Company Comparison Table</div>
+        <div class="ann-desc">All researched companies as rows. Columns: Company, Role, Founded, HQ, Type, Questions. Row hover highlights.</div>
+        <div class="ann-props"><span class="ann-prop">th: 10px 700 caps</span><span class="ann-prop">td: 12px</span><span class="ann-prop">hover: bg-surface</span></div>
+      </div>
+      <div class="ann-item">
+        <div class="ann-key">J1 · STATUS-DOT</div>
+        <div class="ann-name">Completion Indicator</div>
+        <div class="ann-desc">6px circle next to company name. Green = fully researched, Orange = partial.</div>
+        <div class="ann-props"><span class="ann-prop">size: 6×6px</span><span class="ann-prop">green / orange</span></div>
+      </div>
+      <div class="ann-item">
+        <div class="ann-key">K · REC-CARD</div>
+        <div class="ann-name">AI Recommendation</div>
+        <div class="ann-desc">Gradient purple card. Appears after clicking "Which company first?" button. 3-sentence AI output.</div>
+        <div class="ann-props"><span class="ann-prop">bg: gradient #1e1b4b</span><span class="ann-prop">border: #3730a3</span><span class="ann-prop">animation: fadeInUp</span></div>
+      </div>
+    </div>
+
+    <div class="ui-frame">
+      <div class="ui-shell">
+        <div class="ui-sidebar">
+          <div class="ui-logo"><div class="ui-logo-icon">🎯</div><div class="ui-logo-text">Placement Prep</div></div>
+          <div class="ui-tagline">AI-powered interview prep</div>
+          <div class="ui-nav">
+            <div class="ui-nav-item"><span class="ui-nav-icon">🔍</span> Research</div>
+            <div class="ui-nav-item"><span class="ui-nav-icon">💬</span> Chat</div>
+            <div class="ui-nav-item active"><span class="ui-nav-icon">🏢</span> My Companies</div>
+          </div>
+          <hr class="ui-divider"/>
+          <div class="ui-sidebar-footer">Week 5 · Day 34-35</div>
+        </div>
+        <div class="ui-main">
+          <div class="ui-page-title">My Companies</div>
+          <div class="ui-page-caption">All companies researched this session. Click a row to view details.</div>
+
+          <div class="ui-card" style="padding:0;overflow:hidden">
+            <table class="companies-table">
+              <thead>
+                <tr>
+                  <th>Company</th><th>Role</th><th>Founded</th><th>HQ</th><th>Type</th><th>Questions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="status-dot" style="background:#4ade80"></span>Google</td>
+                  <td>Software Engineer</td><td>1998</td><td>Mountain View</td><td>Product</td><td>5</td>
+                </tr>
+                <tr>
+                  <td><span class="status-dot" style="background:#4ade80"></span>Atlassian</td>
+                  <td>SDE-2</td><td>2002</td><td>Sydney</td><td>Product</td><td>5</td>
+                </tr>
+                <tr>
+                  <td><span class="status-dot" style="background:#fb923c"></span>Razorpay</td>
+                  <td>Backend Engineer</td><td>2014</td><td>Bangalore</td><td>Startup</td><td>5</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div style="margin:14px 0 10px">
+            <button class="ui-btn" style="width:auto;padding:9px 18px;font-size:12px;background:linear-gradient(135deg,#1e1b4b,#2e1065);border:1px solid #3730a3;color:#a78bfa;box-shadow:none">
+              🤖 &nbsp;Which company should I target first?
+            </button>
+          </div>
+
+          <div class="rec-card">
+            <strong>🎯 AI Recommendation</strong>
+            Start with <strong>Google</strong> — it has the clearest interview structure and the most available LeetCode preparation material. Once you've built your DSA fundamentals, Atlassian's system design rounds are a natural next step. Razorpay's startup pace makes it a good final target if you want a higher-ownership role.
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="big-divider"></div><div class="section-gap"></div>
+
+<!-- ══════════════════════════ 6. COMPONENT MAP ══════════════ -->
+<div class="spec-section">
+  <div class="spec-section-title">Section 06</div>
+  <div class="spec-section-label">Full Component Map</div>
+  <div class="spec-section-desc">Every reusable component, its props, and which page(s) it appears on.</div>
+
+  <div class="comp-map">
+
+    <div class="comp-card">
+      <div class="comp-card-title">SIDEBAR</div>
+      <div class="comp-card-desc">Fixed left nav. Shared across all 3 pages. Active nav item changes per page.</div>
+      <div class="comp-props">
+        <div class="comp-prop-row"><span class="comp-prop-key">Width</span><span class="comp-prop-val">220px</span></div>
+        <div class="comp-prop-row"><span class="comp-prop-key">Background</span><span class="comp-prop-val">--bg-surface</span></div>
+        <div class="comp-prop-row"><span class="comp-prop-key">Used on</span><span class="comp-prop-val">All pages</span></div>
+      </div>
+    </div>
+
+    <div class="comp-card">
+      <div class="comp-card-title">NAV-ITEM</div>
+      <div class="comp-card-desc">Clickable nav row. 3 states: active (gradient), hover (elevated bg), default.</div>
+      <div class="comp-props">
+        <div class="comp-prop-row"><span class="comp-prop-key">Height</span><span class="comp-prop-val">38px</span></div>
+        <div class="comp-prop-row"><span class="comp-prop-key">Active bg</span><span class="comp-prop-val">linear-gradient</span></div>
+        <div class="comp-prop-row"><span class="comp-prop-key">Transition</span><span class="comp-prop-val">all 0.15s</span></div>
+      </div>
+    </div>
+
+    <div class="comp-card">
+      <div class="comp-card-title">INPUT-CARD</div>
+      <div class="comp-card-desc">2-column form grid. Company, Role, Focus, and Research button. Research page only.</div>
+      <div class="comp-props">
+        <div class="comp-prop-row"><span class="comp-prop-key">Columns</span><span class="comp-prop-val">1fr 1fr</span></div>
+        <div class="comp-prop-row"><span class="comp-prop-key">Padding</span><span class="comp-prop-val">18px</span></div>
+        <div class="comp-prop-row"><span class="comp-prop-key">Used on</span><span class="comp-prop-val">Research</span></div>
+      </div>
+    </div>
+
+    <div class="comp-card">
+      <div class="comp-card-title">PROGRESS-TRACKER</div>
+      <div class="comp-card-desc">Live step list. 3 icon states: ✓ done, spinner running, dot pending. Pulse animation on running label.</div>
+      <div class="comp-props">
+        <div class="comp-prop-row"><span class="comp-prop-key">Border</span><span class="comp-prop-val">1.5px --primary</span></div>
+        <div class="comp-prop-row"><span class="comp-prop-key">Spinner</span><span class="comp-prop-val">CSS @keyframes</span></div>
+        <div class="comp-prop-row"><span class="comp-prop-key">Used on</span><span class="comp-prop-val">Research</span></div>
+      </div>
+    </div>
+
+    <div class="comp-card">
+      <div class="comp-card-title">METRIC-CHIP</div>
+      <div class="comp-card-desc">Founded / HQ / Type stat display. 3-column grid inside Result Card.</div>
+      <div class="comp-props">
+        <div class="comp-prop-row"><span class="comp-prop-key">Label</span><span class="comp-prop-val">9px 700 caps</span></div>
+        <div class="comp-prop-row"><span class="comp-prop-key">Value</span><span class="comp-prop-val">15px 800</span></div>
+        <div class="comp-prop-row"><span class="comp-prop-key">Background</span><span class="comp-prop-val">--bg-base</span></div>
+      </div>
+    </div>
+
+    <div class="comp-card">
+      <div class="comp-card-title">QUESTION-ITEM</div>
+      <div class="comp-card-desc">Row: Q-number + text + difficulty badge. Hover slides right 2px, border turns primary.</div>
+      <div class="comp-props">
+        <div class="comp-prop-row"><span class="comp-prop-key">Hover</span><span class="comp-prop-val">translateX(2px)</span></div>
+        <div class="comp-prop-row"><span class="comp-prop-key">Transition</span><span class="comp-prop-val">0.15s</span></div>
+        <div class="comp-prop-row"><span class="comp-prop-key">Used on</span><span class="comp-prop-val">Research · Companies</span></div>
+      </div>
+    </div>
+
+    <div class="comp-card">
+      <div class="comp-card-title">DIFF-BADGE</div>
+      <div class="comp-card-desc">Easy / Medium / Hard. Each variant: coloured text, dark tinted bg, matching border.</div>
+      <div class="comp-props">
+        <div class="comp-prop-row"><span class="comp-prop-key">Easy</span><span class="comp-prop-val">#4ade80 / #052e16</span></div>
+        <div class="comp-prop-row"><span class="comp-prop-key">Medium</span><span class="comp-prop-val">#fb923c / #431407</span></div>
+        <div class="comp-prop-row"><span class="comp-prop-key">Hard</span><span class="comp-prop-val">#f87171 / #450a0a</span></div>
+      </div>
+    </div>
+
+    <div class="comp-card">
+      <div class="comp-card-title">CHAT-BUBBLE</div>
+      <div class="comp-card-desc">2 variants: user (left, dark) and assistant (right, gradient purple). Max-width 75%.</div>
+      <div class="comp-props">
+        <div class="comp-prop-row"><span class="comp-prop-key">Max width</span><span class="comp-prop-val">75%</span></div>
+        <div class="comp-prop-row"><span class="comp-prop-key">User bg</span><span class="comp-prop-val">--bg-surface</span></div>
+        <div class="comp-prop-row"><span class="comp-prop-key">Bot bg</span><span class="comp-prop-val">gradient purple</span></div>
+      </div>
+    </div>
+
+    <div class="comp-card">
+      <div class="comp-card-title">REC-CARD</div>
+      <div class="comp-card-desc">AI recommendation output on Companies page. Gradient purple bg, fadeInUp on appear.</div>
+      <div class="comp-props">
+        <div class="comp-prop-row"><span class="comp-prop-key">Background</span><span class="comp-prop-val">gradient #1e1b4b</span></div>
+        <div class="comp-prop-row"><span class="comp-prop-key">Animation</span><span class="comp-prop-val">fadeInUp 0.4s</span></div>
+        <div class="comp-prop-row"><span class="comp-prop-key">Used on</span><span class="comp-prop-val">Companies</span></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div style="height:64px"></div>
+
+</body>
+</html>

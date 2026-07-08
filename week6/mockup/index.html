@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Placement Prep Agent — UI Mockup</title>
+<style>
+  /* ── Reset & base ─────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Inter", "Segoe UI", sans-serif;
+    background: #0f1117;
+    color: #e0e0e0;
+    display: flex;
+    min-height: 100vh;
+  }
+
+  /* ── Sidebar ──────────────────────────────────────────────── */
+  .sidebar {
+    width: 240px;
+    min-height: 100vh;
+    background: #1a1d27;
+    border-right: 1px solid #2a2d3a;
+    padding: 24px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .sidebar-logo {
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .sidebar-logo span { font-size: 22px; }
+  .sidebar-tagline {
+    font-size: 11px;
+    color: #6b7280;
+    margin-bottom: 24px;
+    font-style: italic;
+  }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #9ca3af;
+    transition: all 0.15s;
+  }
+  .nav-item:hover { background: #2a2d3a; color: #e0e0e0; }
+  .nav-item.active {
+    background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+    color: #fff;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(79,70,229,0.35);
+  }
+  .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+  .sidebar-divider { border: none; border-top: 1px solid #2a2d3a; margin: 16px 0; }
+  .sidebar-week { font-size: 11px; color: #4b5563; padding: 0 12px; margin-top: auto; }
+
+  /* ── Main content ─────────────────────────────────────────── */
+  .main {
+    flex: 1;
+    padding: 32px 40px;
+    max-width: 960px;
+    overflow-y: auto;
+  }
+
+  /* ── Page header ──────────────────────────────────────────── */
+  .page-header { margin-bottom: 28px; }
+  .page-title {
+    font-size: 26px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #818cf8, #a78bfa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .page-caption { font-size: 13px; color: #6b7280; margin-top: 4px; }
+
+  /* ── Input card ───────────────────────────────────────────── */
+  .card {
+    background: #1a1d27;
+    border: 1px solid #2a2d3a;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+  .input-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .input-group { display: flex; flex-direction: column; gap: 6px; }
+  .input-label { font-size: 12px; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; }
+  .input-field {
+    background: #0f1117;
+    border: 1px solid #2a2d3a;
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: #e0e0e0;
+    font-size: 14px;
+    transition: border-color 0.2s;
+  }
+  .input-field:focus { outline: none; border-color: #4F46E5; }
+  .input-field.filled { border-color: #4F46E5; color: #fff; }
+  select.input-field { cursor: pointer; }
+  .btn-row { display: flex; justify-content: flex-end; }
+  .btn-research {
+    background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 11px 28px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 4px 15px rgba(79,70,229,0.4);
+  }
+  .btn-research:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(79,70,229,0.55); }
+
+  /* ── Progress steps ───────────────────────────────────────── */
+  .progress-card {
+    background: #1a1d27;
+    border: 1px solid #4F46E5;
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+  }
+  .progress-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #818cf8;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .steps { display: flex; flex-direction: column; gap: 10px; }
+  .step {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+  }
+  .step-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+  .step.done .step-icon { background: #065f46; color: #34d399; }
+  .step.done .step-label { color: #34d399; }
+  .step.running .step-icon { background: #312e81; color: #818cf8; }
+  .step.running .step-label { color: #818cf8; }
+  .step.pending .step-icon { background: #1f2937; color: #4b5563; }
+  .step.pending .step-label { color: #4b5563; }
+
+  /* spinner */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner {
+    width: 14px; height: 14px;
+    border: 2px solid #312e81;
+    border-top-color: #818cf8;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    flex-shrink: 0;
+  }
+
+  /* pulse animation for running step */
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+  .step.running .step-label { animation: pulse 1.5s ease-in-out infinite; }
+
+  /* ── Company card ─────────────────────────────────────────── */
+  .company-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .company-name { font-size: 20px; font-weight: 700; color: #fff; }
+  .company-role { font-size: 13px; color: #6b7280; margin-top: 2px; }
+  .company-badge {
+    background: linear-gradient(135deg,#312e81,#4c1d95);
+    color: #a78bfa;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid #4c1d95;
+  }
+  .metrics-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .metric {
+    background: #0f1117;
+    border: 1px solid #2a2d3a;
+    border-radius: 8px;
+    padding: 12px 14px;
+    text-align: center;
+  }
+  .metric-label { font-size: 10px; color: #4b5563; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }
+  .metric-value { font-size: 16px; font-weight: 700; color: #e0e0e0; }
+
+  /* ── Summary ──────────────────────────────────────────────── */
+  .section-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-title::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: #2a2d3a;
+  }
+  .summary-text { font-size: 14px; line-height: 1.7; color: #d1d5db; }
+
+  /* ── Questions ────────────────────────────────────────────── */
+  .questions-list { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+  .question-item {
+    background: #0f1117;
+    border: 1px solid #2a2d3a;
+    border-radius: 8px;
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: border-color 0.2s, transform 0.15s;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .question-item:hover { border-color: #4F46E5; transform: translateX(3px); }
+  .q-number {
+    font-size: 11px;
+    font-weight: 700;
+    color: #4b5563;
+    min-width: 22px;
+    margin-top: 2px;
+  }
+  .q-text { font-size: 13px; color: #d1d5db; line-height: 1.5; flex: 1; }
+  .q-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 12px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .badge-easy   { background: #052e16; color: #4ade80; border: 1px solid #166534; }
+  .badge-medium { background: #431407; color: #fb923c; border: 1px solid #9a3412; }
+  .badge-hard   { background: #450a0a; color: #f87171; border: 1px solid #991b1b; }
+
+  /* ── Fade-in animation for result ────────────────────────── */
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .result-section { animation: fadeInUp 0.4s ease forwards; }
+  .result-section:nth-child(2) { animation-delay: 0.1s; }
+  .result-section:nth-child(3) { animation-delay: 0.2s; }
+
+  /* ── Scrollbar ────────────────────────────────────────────── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: #0f1117; }
+  ::-webkit-scrollbar-thumb { background: #2a2d3a; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════ SIDEBAR ══ -->
+<aside class="sidebar">
+  <div class="sidebar-logo"><span>🎯</span> Placement Prep</div>
+  <div class="sidebar-tagline">AI-powered interview prep</div>
+
+  <nav>
+    <div class="nav-item active">
+      <span class="nav-icon">🔍</span> Research
+    </div>
+    <div class="nav-item">
+      <span class="nav-icon">💬</span> Chat
+    </div>
+    <div class="nav-item">
+      <span class="nav-icon">🏢</span> My Companies
+    </div>
+  </nav>
+
+  <hr class="sidebar-divider" />
+  <div class="sidebar-week">Week 5 · Day 34-35</div>
+</aside>
+
+<!-- ══════════════════════════════════════ MAIN ══════ -->
+<main class="main">
+
+  <!-- Page header -->
+  <div class="page-header">
+    <div class="page-title">Company Research</div>
+    <div class="page-caption">Enter a company and role to generate a full interview prep guide.</div>
+  </div>
+
+  <!-- Input card -->
+  <div class="card">
+    <div class="input-grid">
+      <div class="input-group">
+        <div class="input-label">Company</div>
+        <input class="input-field filled" value="Google" placeholder="e.g. Google, Flipkart" />
+      </div>
+      <div class="input-group">
+        <div class="input-label">Role</div>
+        <input class="input-field filled" value="Software Engineer" placeholder="e.g. SDE-2" />
+      </div>
+      <div class="input-group">
+        <div class="input-label">Focus Area</div>
+        <select class="input-field">
+          <option selected>DSA</option>
+          <option>System Design</option>
+          <option>Behavioral</option>
+        </select>
+      </div>
+      <div style="display:flex;align-items:flex-end;">
+        <button class="btn-research" style="width:100%;justify-content:center;">
+          ✨ Research
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Progress card (running state) -->
+  <div class="progress-card">
+    <div class="progress-title">
+      <div class="spinner"></div>
+      Synthesizing with AI...
+    </div>
+    <div class="steps">
+      <div class="step done">
+        <div class="step-icon">✓</div>
+        <div class="step-label">Company basics fetched</div>
+      </div>
+      <div class="step done">
+        <div class="step-icon">✓</div>
+        <div class="step-label">Interview data collected</div>
+      </div>
+      <div class="step running">
+        <div class="spinner"></div>
+        <div class="step-label">Synthesizing with AI...</div>
+      </div>
+      <div class="step pending">
+        <div class="step-icon">·</div>
+        <div class="step-label">Generating questions</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Result: company card -->
+  <div class="card result-section">
+    <div class="company-header">
+      <div>
+        <div class="company-name">Google</div>
+        <div class="company-role">Software Engineer · DSA Focus</div>
+      </div>
+      <div class="company-badge">🏢 MNC</div>
+    </div>
+    <div class="metrics-row">
+      <div class="metric">
+        <div class="metric-label">Founded</div>
+        <div class="metric-value">1998</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">HQ</div>
+        <div class="metric-value">Mountain View</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Type</div>
+        <div class="metric-value">Product</div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="section-title">Interview Summary</div>
+    <div class="summary-text">
+      Google's Software Engineer interviews heavily emphasise data structures and algorithms.
+      Expect 4–5 rounds: 2–3 coding rounds (LeetCode medium/hard), 1 system design round for
+      experienced roles, and a Googleyness (behavioural) round. Coding interviews test arrays,
+      graphs, dynamic programming and bit manipulation. Preparation tip: solve 150+ LeetCode
+      problems, focus on optimal time &amp; space complexity, and practise explaining your thought
+      process aloud.
+    </div>
+  </div>
+
+  <!-- Result: questions -->
+  <div class="card result-section">
+    <div class="section-title">DSA Interview Questions</div>
+    <div class="questions-list">
+
+      <div class="question-item">
+        <div class="q-number">Q1</div>
+        <div class="q-text">Given an array of integers, find the length of the longest subarray with sum equal to zero.</div>
+        <div class="q-badge badge-medium">Medium</div>
+      </div>
+
+      <div class="question-item">
+        <div class="q-number">Q2</div>
+        <div class="q-text">Implement LRU Cache with O(1) get and put operations.</div>
+        <div class="q-badge badge-hard">Hard</div>
+      </div>
+
+      <div class="question-item">
+        <div class="q-number">Q3</div>
+        <div class="q-text">Given a binary tree, return the zigzag level order traversal of its nodes' values.</div>
+        <div class="q-badge badge-medium">Medium</div>
+      </div>
+
+      <div class="question-item">
+        <div class="q-number">Q4</div>
+        <div class="q-text">Find the minimum number of coins required to make a given amount using dynamic programming.</div>
+        <div class="q-badge badge-easy">Easy</div>
+      </div>
+
+      <div class="question-item">
+        <div class="q-number">Q5</div>
+        <div class="q-text">Given a directed graph, detect if there is a cycle using DFS. Return True or False.</div>
+        <div class="q-badge badge-hard">Hard</div>
+      </div>
+
+    </div>
+  </div>
+
+</main>
+
+</body>
+</html>

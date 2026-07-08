@@ -77,7 +77,7 @@ class ResearchState(TypedDict):
 ### 1. Clone & Install
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/placement-prep-agent
+git clone https://github.com/vedhakoushik/placement-prep-agent
 cd placement-prep-agent
 pip install -r requirements.txt
 ```

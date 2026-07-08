@@ -1,0 +1,83 @@
+<!-- INPUT patterns -->
+
+<!-- Text input — default state -->
+<div style="display:flex;flex-direction:column;gap:5px">
+  <label style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.08em">Company</label>
+  <input
+    placeholder="e.g. Google, Flipkart"
+    style="
+      background:#0f1117;
+      border:1px solid #2a2d3a;
+      border-radius:6px;
+      padding:9px 12px;
+      color:#94a3b8;
+      font-size:13px;
+      font-family:inherit;
+      outline:none;
+      transition:border-color 0.2s;
+      width:100%;
+    "
+  />
+</div>
+
+<!-- Text input — filled / focused state (border turns primary) -->
+<div style="display:flex;flex-direction:column;gap:5px">
+  <label style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.08em">Company</label>
+  <input
+    value="Google"
+    style="
+      background:#0f1117;
+      border:1px solid #4F46E5;
+      border-radius:6px;
+      padding:9px 12px;
+      color:#f1f5f9;
+      font-size:13px;
+      font-family:inherit;
+      outline:none;
+      width:100%;
+    "
+  />
+</div>
+
+<!-- Select / dropdown -->
+<div style="display:flex;flex-direction:column;gap:5px">
+  <label style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.08em">Focus Area</label>
+  <select style="
+    background:#0f1117;
+    border:1px solid #2a2d3a;
+    border-radius:6px;
+    padding:9px 12px;
+    color:#94a3b8;
+    font-size:13px;
+    font-family:inherit;
+    outline:none;
+    cursor:pointer;
+    width:100%;
+  ">
+    <option>DSA</option>
+    <option>System Design</option>
+    <option>Behavioral</option>
+  </select>
+</div>
+
+<!-- Chat input bar -->
+<div style="
+  display:flex;gap:8px;
+  background:#1a1d27;
+  border:1px solid #2a2d3a;
+  border-radius:10px;
+  padding:10px 14px;
+  align-items:center;
+">
+  <input
+    placeholder="Ask anything about your interview prep…"
+    style="background:transparent;border:none;flex:1;color:#e2e8f0;font-size:13px;font-family:inherit;outline:none"
+  />
+  <button style="
+    background:linear-gradient(135deg,#4F46E5,#7C3AED);
+    border:none;border-radius:6px;
+    width:30px;height:30px;
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;font-size:13px;color:#fff;flex-shrink:0;
+  ">➤</button>
+</div>

@@ -1,8 +1,8 @@
 """Day 12 — Chains With Memory
-ConversationBufferMemory  — keeps the full history (accurate, costs more tokens)
-ConversationSummaryMemory — compresses history into a summary (cheaper, less precise)
+Buffer memory  — keeps every message (accurate, grows with turns)
+Summary memory — LLM compresses old history (cheaper, less precise)
 RunnableWithMessageHistory — modern LCEL way, session-ID-based.
-Task: ask about Amazon, then ask 'what about their competitors?' — chain must know context."""
+Task: ask about Amazon, then 'what about their competitors?' — chain must keep context."""
 
 import os
 from dotenv import load_dotenv
@@ -10,9 +10,8 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables.history import RunnableWithMessageHistory
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_community.chat_message_histories import ChatMessageHistory
-from langchain.memory import ConversationBufferMemory, ConversationSummaryMemory
-from langchain.chains import ConversationChain
 
 load_dotenv()
 
@@ -28,47 +27,72 @@ llm = ChatGoogleGenerativeAI(
 )
 
 
-# ── approach 1: ConversationBufferMemory ───────────────────────
-# keeps every message — accurate but grows with every turn
+# ── approach 1: manual buffer memory ──────────────────────────
+# keep every message in a list — pass them all each turn
 def demo_buffer_memory():
-    divider("ConversationBufferMemory  (keeps full history)")
+    divider("Buffer Memory  (keeps full history)")
 
-    memory = ConversationBufferMemory()
-    chain  = ConversationChain(llm=llm, memory=memory, verbose=False)
+    history = ChatMessageHistory()
+    history.add_message(SystemMessage(content="You are a placement advisor for Indian engineering students."))
 
-    r1 = chain.predict(input="Tell me about Amazon as a company for a fresher.")
+    def chat(question: str) -> str:
+        history.add_user_message(question)
+        response = llm.invoke(history.messages)
+        history.add_ai_message(response.content)
+        return response.content
+
+    r1 = chat("Tell me about Amazon as a company for a fresher.")
     print(f"Turn 1: {r1[:120]}...\n")
 
-    r2 = chain.predict(input="What about their main competitors?")
-    print(f"Turn 2: {r2[:120]}...")        # should reference Amazon without you saying it
-    print(f"\n  Messages in buffer: {len(memory.chat_memory.messages)}")
+    r2 = chat("What about their main competitors?")  # 'their' = Amazon from history
+    print(f"Turn 2: {r2[:120]}...")
+    print(f"\n  Messages in buffer: {len(history.messages)}")
 
 
-# ── approach 2: ConversationSummaryMemory ──────────────────────
-# Claude summarizes old history — stays small but loses fine detail
+# ── approach 2: manual summary memory ─────────────────────────
+# after each turn, ask the LLM to compress history into one paragraph
 def demo_summary_memory():
-    divider("ConversationSummaryMemory  (compresses history)")
+    divider("Summary Memory  (compresses history into a running summary)")
 
-    memory = ConversationSummaryMemory(llm=llm)
-    chain  = ConversationChain(llm=llm, memory=memory, verbose=False)
+    summary = ""
 
-    chain.predict(input="Tell me about Google as a company for freshers.")
-    chain.predict(input="What roles do they typically hire freshers for?")
-    r3 = chain.predict(input="Which role has the best salary?")
+    def chat(question: str) -> str:
+        nonlocal summary
+
+        # build prompt: inject summary + new question
+        msgs = [SystemMessage(content="You are a placement advisor for Indian engineering students.")]
+        if summary:
+            msgs.append(SystemMessage(content=f"Conversation so far (summary): {summary}"))
+        msgs.append(HumanMessage(content=question))
+
+        response = llm.invoke(msgs)
+        answer   = response.content
+
+        # compress history into updated summary
+        compress_prompt = (
+            f"Summarise this conversation in 2-3 sentences:\n"
+            f"Previous summary: {summary}\n"
+            f"User: {question}\nAssistant: {answer}"
+        )
+        summary = llm.invoke([HumanMessage(content=compress_prompt)]).content
+        return answer
+
+    chat("Tell me about Google as a company for freshers.")
+    chat("What roles do they typically hire freshers for?")
+    r3 = chat("Which role has the best salary?")
     print(f"Turn 3: {r3[:120]}...")
-    print(f"\n  Summary stored:\n  {memory.buffer[:200]}...")   # compressed history
+    print(f"\n  Summary stored:\n  {summary[:200]}...")
 
 
 # ── approach 3: RunnableWithMessageHistory ─────────────────────
-# modern LCEL approach — session_id separates different conversations
-store = {}      # in-memory session store: {session_id: ChatMessageHistory}
+# modern LCEL — session_id separates different conversations automatically
+store = {}   # {session_id: ChatMessageHistory}
 
 def get_session_history(session_id: str) -> ChatMessageHistory:
     if session_id not in store:
         store[session_id] = ChatMessageHistory()
     return store[session_id]
 
-# prompt must include MessagesPlaceholder for history to be injected
 prompt = ChatPromptTemplate.from_messages([
     ("system", "You are a placement advisor helping an engineering student in India."),
     MessagesPlaceholder(variable_name="history"),   # past messages injected here
@@ -85,7 +109,6 @@ chain_with_history = RunnableWithMessageHistory(
 )
 
 def ask(session_id: str, question: str) -> str:
-    """Ask a question in a named session."""
     response = chain_with_history.invoke(
         {"input": question},
         config={"configurable": {"session_id": session_id}},
@@ -100,15 +123,15 @@ def demo_runnable_with_history():
 
     # session 1: Amazon conversation
     ask("s1", "Tell me about Amazon's interview process for a fresher SDE.")
-    ask("s1", "What about their competitors?")          # must know 'their' = Amazon
+    ask("s1", "What about their competitors?")           # 'their' = Amazon from s1 history
 
-    # session 2: completely separate — no memory of session 1
+    # session 2: separate — no memory of session 1
     ask("s2", "What is the fresher salary at TCS?")
     ask("s2", "How does that compare to their main Indian competitors?")  # 'their' = TCS
 
     print(f"  Session s1 has {len(store['s1'].messages)} messages")
     print(f"  Session s2 has {len(store['s2'].messages)} messages")
-    print("  Different session_id = different conversation = independent memory")
+    print("  Different session_id = independent memory")
 
 
 # ── main ───────────────────────────────────────────────────────

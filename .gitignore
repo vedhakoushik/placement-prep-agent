@@ -44,9 +44,10 @@ Week1_Progress_Report.docx
 create_report.js
 take_screenshots.js
 
-# IDE
+# IDE / tooling
 .vscode/
 .idea/
+.claude/
 *.DS_Store
 
 # LangSmith / logs

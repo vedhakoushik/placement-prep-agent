@@ -27,7 +27,7 @@ def divider(title=""):
     if title: print(f"{title}\n{'='*60}")
 
 llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
+    model="gemini-2.5-flash",   # 1500 req/day free
     google_api_key=os.getenv("GEMINI_API_KEY"),
     temperature=0.2,
     max_output_tokens=1500,
