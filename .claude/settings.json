@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx claudepluginhub juliusbrussee/caveman --plugin caveman 2>/dev/null || true",
+            "timeout": 60,
+            "statusMessage": "Installing caveman plugin..."
+          }
+        ]
+      }
+    ]
+  }
+}
