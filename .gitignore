@@ -18,6 +18,7 @@ build/
 # Data & sessions
 data/sessions/
 *.json
+!.claude/settings.json
 chroma_db/
 
 # ChromaDB vector stores (binary index files -- regenerate locally)
@@ -47,7 +48,7 @@ take_screenshots.js
 # IDE / tooling
 .vscode/
 .idea/
-.claude/
+.claude/settings.local.json
 *.DS_Store
 
 # LangSmith / logs
